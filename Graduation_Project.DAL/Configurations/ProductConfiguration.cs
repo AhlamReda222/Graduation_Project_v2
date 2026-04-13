@@ -30,13 +30,6 @@ namespace Graduation_Project.DAL.Configurations
             builder.Property(p => p.Description)
                 .HasColumnType("text");
 
-            builder.Property(p => p.Price)
-                .IsRequired()
-                .HasColumnType("decimal(10,2)");
-
-            builder.Property(p => p.StockQuantity)
-                .IsRequired()
-                .HasDefaultValue(0);
 
             builder.Property(p => p.ImageUrls)
                 .HasColumnType("text");
@@ -78,9 +71,7 @@ namespace Graduation_Project.DAL.Configurations
             builder.HasIndex(p => p.ApprovalStatus)
                 .HasDatabaseName("IX_Products_ApprovalStatus");
 
-            builder.HasIndex(p => p.Price)
-                .HasDatabaseName("IX_Products_Price");
-
+           
             builder.HasMany(p => p.CartItems)
                 .WithOne(ci => ci.Product)
                 .HasForeignKey(ci => ci.ProductId)
@@ -100,6 +91,16 @@ namespace Graduation_Project.DAL.Configurations
                 .WithOne(d => d.Product)
                 .HasForeignKey(d => d.ProductId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+                builder.HasMany(p => p.Variants)
+    .WithOne(v => v.Product)
+    .HasForeignKey(v => v.ProductId)
+    .OnDelete(DeleteBehavior.Cascade);
+
+builder.HasMany(p => p.CustomizationZones)
+    .WithOne(z => z.Product)
+    .HasForeignKey(z => z.ProductId)
+    .OnDelete(DeleteBehavior.Cascade);
 
         }
     }

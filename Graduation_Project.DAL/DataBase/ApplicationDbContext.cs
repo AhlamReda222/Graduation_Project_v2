@@ -28,6 +28,11 @@ namespace Graduation_Project.DAL.DataBase
         public DbSet<Message> Messages { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
 
+        public DbSet<ProductVariant> ProductVariants { get; set; }
+        public DbSet<ProductCustomizationZone> ProductCustomizationZones { get; set; }
+        public DbSet<PrintingTechnique> PrintingTechniques { get; set; }
+        public DbSet<OrderItemCustomization> OrderItemCustomizations { get; set; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);

@@ -182,9 +182,7 @@ namespace Graduation_Project.BLL.Services.Implementations
                 if (category == null)
                     return ServiceResult<CategoryStatsDto>.Failure("Category not found");
 
-                var avgPrice = category.Products.Any()
-                    ? category.Products.Average(p => p.Price)
-                    : 0m;
+             
 
                 var avgRating = category.Products.Any()
                     ? category.Products.Average(p => (double)p.AverageRating)
@@ -197,7 +195,6 @@ namespace Graduation_Project.BLL.Services.Implementations
                     TotalProducts = category.Products.Count,
                     TotalOrders = 0,
                     TotalRevenue = 0m,
-                    AverageProductPrice = avgPrice,
                     AverageRating = avgRating
                 };
 

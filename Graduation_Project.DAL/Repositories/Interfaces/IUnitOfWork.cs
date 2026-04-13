@@ -18,6 +18,10 @@ namespace Graduation_Project.DAL.Repositories.Interfaces
         IGenericRepository<Message> Messages { get; }
         IGenericRepository<Profile> Profiles { get; }
         IGenericRepository<ApplicationUser> ApplicationUsers { get; }
+        IGenericRepository<ProductVariant> ProductVariants { get; }
+        IGenericRepository<ProductCustomizationZone> ProductCustomizationZones { get; }
+        IGenericRepository<PrintingTechnique> PrintingTechniques { get; }
+        IGenericRepository<OrderItemCustomization> OrderItemCustomizations { get; }
 
         Task<int> SaveAsync();
     }

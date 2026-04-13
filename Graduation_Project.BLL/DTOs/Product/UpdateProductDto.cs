@@ -1,0 +1,26 @@
+using System.ComponentModel.DataAnnotations;
+
+namespace Graduation_Project.BLL.DTOs.Product
+{
+    public class UpdateProductDto
+    {
+        [Required]
+        [MaxLength(200)]
+        public string ProductName { get; set; }
+
+        [MaxLength(1000)]
+        public string Description { get; set; }
+
+        public string ImageUrls { get; set; }
+
+        public int CategoryId { get; set; }
+
+        public bool AllowsCustomization { get; set; }
+
+        public bool IsActive { get; set; }
+
+        public List<CreateProductVariantDto> Variants { get; set; }
+
+        public List<int> CustomizationZones { get; set; } = new();
+    }
+}

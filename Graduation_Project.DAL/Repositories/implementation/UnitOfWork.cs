@@ -22,6 +22,11 @@ namespace Graduation_Project.DAL.Repositories.Implementations
         public IGenericRepository<Conversation> Conversations { get; }
         public IGenericRepository<Message> Messages { get; }
         public IGenericRepository<Profile> Profiles { get; }
+        
+        public IGenericRepository<ProductVariant> ProductVariants { get; }
+        public  IGenericRepository<ProductCustomizationZone> ProductCustomizationZones { get; }
+        public IGenericRepository<PrintingTechnique> PrintingTechniques { get; }
+        public IGenericRepository<OrderItemCustomization> OrderItemCustomizations { get; }
 
         public UnitOfWork(ApplicationDbContext context)
         {
@@ -40,6 +45,10 @@ namespace Graduation_Project.DAL.Repositories.Implementations
             Messages = new GenericRepository<Message>(_context);
             Profiles = new GenericRepository<Profile>(_context);
             ApplicationUsers = new GenericRepository<ApplicationUser>(_context);
+            ProductVariants = new GenericRepository<ProductVariant>(_context);
+            ProductCustomizationZones = new GenericRepository<ProductCustomizationZone>(_context);
+            PrintingTechniques = new GenericRepository<PrintingTechnique>(_context);
+            OrderItemCustomizations = new GenericRepository<OrderItemCustomization>(_context);
         }
 
         public async Task<int> SaveAsync()

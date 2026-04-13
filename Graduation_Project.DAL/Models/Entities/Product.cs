@@ -15,8 +15,8 @@ namespace Graduation_Project.DAL.Models.Entities
         public int CategoryId { get; set; }
         public string ProductName { get; set; }
         public string Description { get; set; }
-        public decimal Price { get; set; }
-        public int StockQuantity { get; set; }
+        public bool AllowsCustomization { get; set; } = false; // ✅ الجديد
+        public string RejectionReason { get; set; }           // ✅ الجديد - سبب الرفض من الـ AI
         public string ImageUrls { get; set; }
         public ApprovalStatus ApprovalStatus { get; set; }
         public DateTime? ApprovalDate { get; set; }
@@ -35,5 +35,7 @@ namespace Graduation_Project.DAL.Models.Entities
         public virtual ICollection<OrderItem> OrderItems { get; set; }
         public virtual ICollection<Review> Reviews { get; set; }
         public virtual ICollection<Discount> Discounts { get; set; }
+         public virtual ICollection<ProductVariant> Variants { get; set; }              // ✅ الجديد
+        public virtual ICollection<ProductCustomizationZone> CustomizationZones { get; set; } // ✅ الجديد
     }
 }

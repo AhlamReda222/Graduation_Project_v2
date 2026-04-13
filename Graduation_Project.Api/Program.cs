@@ -94,6 +94,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<IBrandService, BrandService>();
 builder.Services.AddScoped<IContractService, ContractService>();
+builder.Services.AddScoped<IProductService, ProductService>();
 // CORS
 builder.Services.AddCors(options =>
 {
@@ -106,7 +107,9 @@ var app = builder.Build();
 #region Seed Data
 using (var scope = app.Services.CreateScope())
 {
-   // await AdminSeeder.SeedAdminAsync(scope.ServiceProvider);
+    await AdminSeeder.SeedAdminAsync(scope.ServiceProvider);
+    await PrintingTechniqueSeeder.SeedAsync(scope.ServiceProvider); 
+
 }
 #endregion
 

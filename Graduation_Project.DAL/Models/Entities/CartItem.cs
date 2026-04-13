@@ -12,11 +12,15 @@ namespace Graduation_Project.DAL.Models.Entities
         public int CartItemId { get; set; }
         public int UserId { get; set; }
         public int ProductId { get; set; }
+        public int VariantId { get; set; } // ✅ زيدي ده
+
         public int Quantity { get; set; }
         public DateTime AddedAt { get; set; }
 
         // Navigation Properties
         public virtual ApplicationUser User { get; set; }
         public virtual Product Product { get; set; }
+         public virtual ProductVariant ProductVariant { get; set; } // ✅ زيدي ده
+
     }
 }
