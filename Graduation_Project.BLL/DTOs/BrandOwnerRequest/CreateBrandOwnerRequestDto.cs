@@ -13,9 +13,6 @@ namespace Graduation_Project.BLL.DTOs.BrandOwnerRequest
         [MaxLength(500)]
         public string BusinessLicense { get; set; }
 
-        [Required(ErrorMessage = "Tax ID is required")]
-        [MaxLength(50)]
-        public string TaxId { get; set; }
 
         // ✅ بيانات البراند في نفس الطلب
         [Required(ErrorMessage = "Brand name is required")]

@@ -33,7 +33,6 @@ namespace Graduation_Project.BLL.Services.Implementations
                 UserId = userId,
                 BusinessName = dto.BusinessName,
                 BusinessLicense = dto.BusinessLicense,
-                TaxId = dto.TaxId,
                 // ✅ بيانات البراند
                 BrandName = dto.BrandName,
                 BrandDescription = dto.BrandDescription,
@@ -188,7 +187,6 @@ namespace Graduation_Project.BLL.Services.Implementations
                 UserEmail = request.User?.Email,
                 BusinessName = request.BusinessName,
                 BusinessLicense = request.BusinessLicense,
-                TaxId = request.TaxId,
                 BrandName = request.BrandName,
                 BrandDescription = request.BrandDescription,
                 BrandLogoUrl = request.BrandLogoUrl,

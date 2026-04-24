@@ -27,9 +27,6 @@ namespace Graduation_Project.DAL.Configurations
                 .IsRequired()
                 .HasMaxLength(500);
 
-            builder.Property(r => r.TaxId)
-                .IsRequired()
-                .HasMaxLength(50);
 
             builder.Property(r => r.RequestStatus)
                 .IsRequired()

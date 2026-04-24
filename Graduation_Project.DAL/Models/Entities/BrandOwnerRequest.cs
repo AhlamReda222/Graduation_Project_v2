@@ -13,7 +13,6 @@ namespace Graduation_Project.DAL.Models.Entities
         public int UserId { get; set; }
         public string BusinessName { get; set; }
         public string BusinessLicense { get; set; }
-        public string TaxId { get; set; }
 
         // ✅ بيانات البراند
         public string BrandName { get; set; }
