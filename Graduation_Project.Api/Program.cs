@@ -94,7 +94,10 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<IBrandService, BrandService>();
 builder.Services.AddScoped<IContractService, ContractService>();
+builder.Services.AddHttpClient<IAiModerationService, AiModerationService>();
 builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<ICartService, CartService>();
+builder.Services.AddScoped<IOrderService, OrderService>();
 // CORS
 builder.Services.AddCors(options =>
 {

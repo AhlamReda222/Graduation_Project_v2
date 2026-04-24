@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-
 namespace Graduation_Project.DAL.Models.Entities
 {
     public class BrandOwnerRequest
@@ -15,13 +14,18 @@ namespace Graduation_Project.DAL.Models.Entities
         public string BusinessName { get; set; }
         public string BusinessLicense { get; set; }
         public string TaxId { get; set; }
+
+        // ✅ بيانات البراند
+        public string BrandName { get; set; }
+        public string BrandDescription { get; set; }
+        public string BrandLogoUrl { get; set; }
+
         public RequestStatus RequestStatus { get; set; }
         public DateTime RequestDate { get; set; }
         public int? ReviewedBy { get; set; }
         public DateTime? ReviewDate { get; set; }
 
-        // Navigation Properties
-        public virtual ApplicationUser User { get; set; }  
-        public virtual ApplicationUser Reviewer { get; set; }  
+        public virtual ApplicationUser User { get; set; }
+        public virtual ApplicationUser Reviewer { get; set; }
     }
 }

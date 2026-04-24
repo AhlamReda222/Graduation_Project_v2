@@ -16,7 +16,10 @@ namespace Graduation_Project.DAL.Models.Entities
         public string ProductName { get; set; }
         public string Description { get; set; }
         public bool AllowsCustomization { get; set; } = false; // ✅ الجديد
-        public string RejectionReason { get; set; }           // ✅ الجديد - سبب الرفض من الـ AI
+        public bool AllowsPrinting { get; set; } = false;   // ✅ الجديد
+        public bool AllowsText { get; set; } = false;        // ✅ الجديد
+        public decimal BasePrice { get; set; }
+        public string? RejectionReason { get; set; }           // ✅ الجديد - سبب الرفض من الـ AI
         public string ImageUrls { get; set; }
         public ApprovalStatus ApprovalStatus { get; set; }
         public DateTime? ApprovalDate { get; set; }
@@ -26,6 +29,7 @@ namespace Graduation_Project.DAL.Models.Entities
         public bool IsActive { get; set; }
         public decimal AverageRating { get; set; }
         public int ReviewCount { get; set; }
+        public int StockQuantity { get; set; } // ✅ ضيفي ده
 
         // Navigation Properties
         public virtual Brand Brand { get; set; }

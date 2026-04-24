@@ -5,7 +5,6 @@ namespace Graduation_Project.BLL.Services.Interfaces
 {
     public interface IBrandService
     {
-        Task<ServiceResult<BrandDto>> CreateBrandAsync(int userId, CreateBrandDto dto);
         Task<ServiceResult<BrandDto>> GetBrandByIdAsync(int brandId);
         Task<ServiceResult<List<BrandDto>>> GetAllBrandsAsync();
         Task<ServiceResult<List<BrandDto>>> GetBrandsByOwnerAsync(int userId);

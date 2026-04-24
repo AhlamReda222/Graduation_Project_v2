@@ -13,14 +13,17 @@ namespace Graduation_Project.BLL.DTOs.Product
         public string Description { get; set; }
         public string ImageUrls { get; set; }
         public bool AllowsCustomization { get; set; }
-        public List<string> CustomizationZones { get; set; }
+        // null لو مش بيقبل customization
+        public ProductCustomizationOptionsDto CustomizationOptions { get; set; }
         public ApprovalStatus ApprovalStatus { get; set; }
         public string ApprovalStatusText { get; set; }
         public string RejectionReason { get; set; }
         public DateTime CreatedAt { get; set; }
         public bool IsActive { get; set; }
+
         public decimal AverageRating { get; set; }
         public int ReviewCount { get; set; }
+public decimal BasePrice { get; set; }
         public List<ProductVariantDto> Variants { get; set; }
     }
 }

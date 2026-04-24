@@ -33,6 +33,7 @@ namespace Graduation_Project.DAL.Configurations
             builder.Property(ci => ci.AddedAt)
                 .IsRequired()
                 .HasDefaultValueSql("NOW()");
+                
 
             builder.HasIndex(ci => new { ci.UserId, ci.ProductId })
                 .IsUnique()

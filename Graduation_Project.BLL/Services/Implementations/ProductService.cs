@@ -11,102 +11,163 @@ namespace Graduation_Project.BLL.Services.Implementations
     public class ProductService : IProductService
     {
         private readonly IUnitOfWork _unitOfWork;
+            private readonly IAiModerationService _aiModerationService;
 
-        public ProductService(IUnitOfWork unitOfWork)
+
+        public ProductService(IUnitOfWork unitOfWork ,IAiModerationService aiModerationService)
         {
             _unitOfWork = unitOfWork;
-        }
+                    _aiModerationService = aiModerationService;
 
-        // Owner يضيف Product
-        public async Task<ServiceResult<ProductDto>> CreateProductAsync(int userId, int brandId, CreateProductDto dto)
+        }
+public async Task<ServiceResult<ProductDto>> CreateProductAsync(int userId, int brandId, CreateProductDto dto)
+{
+    try
+    {
+        var brand = await _unitOfWork.Brands
+            .GetQueryable()
+            .FirstOrDefaultAsync(b => b.BrandId == brandId && b.UserId == userId);
+
+        if (brand == null)
+            return ServiceResult<ProductDto>.Failure("Brand not found or not yours");
+
+        if (!brand.IsActive)
+            return ServiceResult<ProductDto>.Failure("Brand is not active");
+
+        var user = await _unitOfWork.ApplicationUsers.GetByIdAsync(userId);
+        if (user == null || !user.HasAcceptedContract)
+            return ServiceResult<ProductDto>.Failure("You must accept the contract first");
+
+        var category = await _unitOfWork.Categories.GetByIdAsync(dto.CategoryId);
+        if (category == null)
+            return ServiceResult<ProductDto>.Failure("Category not found");
+
+        bool hasVariants = dto.Variants != null && dto.Variants.Any();
+
+        // ✅ validation مهم جدًا
+        if (!hasVariants)
         {
-            try
+            if (dto.BasePrice <= 0)
+                return ServiceResult<ProductDto>.Failure("Base price is required");
+
+            if (dto.StockQuantity == null || dto.StockQuantity <= 0)
+                return ServiceResult<ProductDto>.Failure("Stock is required when no variants");
+        }
+
+        if (hasVariants && dto.StockQuantity != null)
+            return ServiceResult<ProductDto>.Failure("Do not send stock for product when using variants");
+
+        bool allowsCustomization = dto.Customization != null
+            && (dto.Customization.AllowsPrinting || dto.Customization.AllowsText);
+
+        if (allowsCustomization && (dto.Customization.Zones == null || !dto.Customization.Zones.Any()))
+            return ServiceResult<ProductDto>.Failure("Customizable products must have at least one zone");
+
+        // ✅ AI request (safe)
+        var aiRequest = new AiModerationRequestDto
+        {
+            ProductName = dto.ProductName,
+            Description = dto.Description,
+            Price = hasVariants 
+                ? dto.Variants.Min(v => v.Price) 
+                : dto.BasePrice,
+            Category = category.CategoryName,
+            ImageUrl = dto.ImageUrls?.Split(',').FirstOrDefault()?.Trim()
+        };
+
+        var aiResult = await _aiModerationService.ModerateProductAsync(aiRequest);
+
+        var approvalStatus = aiResult.Status switch
+        {
+            "auto_approved" => ApprovalStatus.Approved,
+            "rejected" => ApprovalStatus.Rejected,
+            _ => ApprovalStatus.Pending
+        };
+
+        var product = new Product
+        {
+            BrandId = brandId,
+            CategoryId = dto.CategoryId,
+            ProductName = dto.ProductName,
+            Description = dto.Description,
+            ImageUrls = dto.ImageUrls,
+
+            BasePrice = hasVariants
+                ? dto.Variants.Min(v => v.Price)
+                : dto.BasePrice,
+
+            // ✅ هنا الفرق المهم
+            StockQuantity = hasVariants ? 0 : dto.StockQuantity!.Value,
+
+            AllowsCustomization = allowsCustomization,
+            AllowsPrinting = allowsCustomization && dto.Customization.AllowsPrinting,
+            AllowsText = allowsCustomization && dto.Customization.AllowsText,
+
+            ApprovalStatus = approvalStatus,
+            IsActive = approvalStatus == ApprovalStatus.Approved,
+            ApprovalDate = approvalStatus == ApprovalStatus.Approved ? DateTime.UtcNow : null,
+            RejectionReason = approvalStatus == ApprovalStatus.Rejected ? aiResult.Reason : "N/A",
+
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        await _unitOfWork.Products.AddAsync(product);
+
+        // ✅ Variants
+        if (hasVariants)
+        {
+            foreach (var v in dto.Variants)
             {
-                // تأكد إن الـ Brand بتاع الـ Owner ده
-                var brand = await _unitOfWork.Brands
-                    .GetQueryable()
-                    .FirstOrDefaultAsync(b => b.BrandId == brandId && b.UserId == userId);
+                if (v.StockQuantity <= 0)
+                    return ServiceResult<ProductDto>.Failure("Variant stock must be greater than 0");
 
-                if (brand == null)
-                    return ServiceResult<ProductDto>.Failure("Brand not found or not yours");
-
-                if (!brand.IsActive)
-                    return ServiceResult<ProductDto>.Failure("Brand is not active");
-
-                // تأكد إن الـ User وافق على العقد
-                var user = await _unitOfWork.ApplicationUsers.GetByIdAsync(userId);
-                if (user == null || !user.HasAcceptedContract)
-                    return ServiceResult<ProductDto>.Failure("You must accept the contract first");
-
-                // تأكد إن الـ Category موجودة
-                var category = await _unitOfWork.Categories.GetByIdAsync(dto.CategoryId);
-                if (category == null)
-                    return ServiceResult<ProductDto>.Failure("Category not found");
-
-                // لازم يكون فيه variants
-                if (dto.Variants == null || !dto.Variants.Any())
-                    return ServiceResult<ProductDto>.Failure("Product must have at least one variant");
-
-                // لو بيقبل customization لازم يكون فيه zones
-                if (dto.AllowsCustomization && (!dto.CustomizationZones.Any()))
-                    return ServiceResult<ProductDto>.Failure("Customizable products must have at least one customization zone");
-
-                var product = new Product
+                await _unitOfWork.ProductVariants.AddAsync(new ProductVariant
                 {
-                    BrandId = brandId,
-                    CategoryId = dto.CategoryId,
-                    ProductName = dto.ProductName,
-                    Description = dto.Description,
-                    ImageUrls = dto.ImageUrls,
-                    AllowsCustomization = dto.AllowsCustomization,
-                    ApprovalStatus = ApprovalStatus.Pending,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow,
-                    IsActive = false // مش هيتنشر إلا بعد موافقة الـ AI
-                };
-
-                await _unitOfWork.Products.AddAsync(product);
-                await _unitOfWork.SaveAsync();
-
-                // إضافة الـ Variants
-                foreach (var v in dto.Variants)
-                {
-                    await _unitOfWork.ProductVariants.AddAsync(new ProductVariant
-                    {
-                        ProductId = product.ProductId,
-                        Size = v.Size,
-                        Color = v.Color,
-                        Price = v.Price,
-                        StockQuantity = v.StockQuantity,
-                        SKU = v.SKU ?? $"{product.ProductId}-{v.Size}-{v.Color}"
-                    });
-                }
-
-                // إضافة الـ Customization Zones لو موجودة
-                if (dto.AllowsCustomization)
-                {
-                    foreach (var zone in dto.CustomizationZones)
-                    {
-                        await _unitOfWork.ProductCustomizationZones.AddAsync(new ProductCustomizationZone
-                        {
-                            ProductId = product.ProductId,
-                            Zone = (CustomizationZone)zone,
-                            IsAvailable = true
-                        });
-                    }
-                }
-
-                await _unitOfWork.SaveAsync();
-
-                return await GetProductByIdAsync(product.ProductId);
-            }
-            catch (Exception ex)
-            {
-                return ServiceResult<ProductDto>.Failure($"Error creating product: {ex.Message}");
+                    Product = product,
+                    Size = v.Size,
+                    Color = v.Color,
+                    Price = v.Price,
+                    StockQuantity = v.StockQuantity,
+                    SKU = v.SKU ?? $"{product.ProductName}-{v.Size}-{v.Color}"
+                });
             }
         }
 
-        // يجيب Product بالـ ID
+        // ✅ Customization Zones
+        if (allowsCustomization)
+        {
+            foreach (var zone in dto.Customization.Zones)
+            {
+                await _unitOfWork.ProductCustomizationZones.AddAsync(new ProductCustomizationZone
+                {
+                    Product = product,
+                    Zone = (CustomizationZone)zone,
+                    IsAvailable = true
+                });
+            }
+        }
+
+        await _unitOfWork.SaveAsync();
+
+        var productDto = await GetProductByIdAsync(product.ProductId);
+        if (!productDto.Succeeded)
+            return productDto;
+
+        var message = approvalStatus switch
+        {
+            ApprovalStatus.Approved => "تمت إضافة المنتج بنجاح ونُشر تلقائياً",
+            ApprovalStatus.Rejected => $"تم رفض المنتج: {aiResult.Reason}",
+            _ => "تمت إضافة المنتج وهو في انتظار المراجعة"
+        };
+
+        return ServiceResult<ProductDto>.Success(productDto.Data, message);
+    }
+    catch (Exception ex)
+    {
+        return ServiceResult<ProductDto>.Failure(ex.ToString());
+    }
+} // يجيب Product بالـ ID
         public async Task<ServiceResult<ProductDto>> GetProductByIdAsync(int productId)
         {
             try
@@ -220,84 +281,160 @@ namespace Graduation_Project.BLL.Services.Implementations
                 return ServiceResult<List<ProductDto>>.Failure($"Error fetching pending products: {ex.Message}");
             }
         }
+public async Task<ServiceResult<ProductDto>> UpdateProductAsync(int productId, int userId, UpdateProductDto dto)
+{
+    try
+    {
+        var product = await _unitOfWork.Products
+            .GetQueryable()
+            .Include(p => p.Brand)
+            .Include(p => p.Variants)
+            .Include(p => p.CustomizationZones)
+            .FirstOrDefaultAsync(p => p.ProductId == productId);
 
-        // Owner يعدل Product بتاعته
-        public async Task<ServiceResult<ProductDto>> UpdateProductAsync(int productId, int userId, UpdateProductDto dto)
+        if (product == null)
+            return ServiceResult<ProductDto>.Failure("Product not found");
+
+        if (product.Brand.UserId != userId)
+            return ServiceResult<ProductDto>.Failure("You can only update your own products");
+
+        bool hasVariants = dto.Variants != null && dto.Variants.Any();
+
+        // ✅ نفس validation بتاع Create
+        if (!hasVariants)
         {
-            try
+            if (dto.BasePrice <= 0)
+                return ServiceResult<ProductDto>.Failure("Base price is required");
+
+            if (dto.StockQuantity == null || dto.StockQuantity <= 0)
+                return ServiceResult<ProductDto>.Failure("Stock is required when no variants");
+        }
+
+        if (hasVariants && dto.StockQuantity != null)
+            return ServiceResult<ProductDto>.Failure("Do not send stock for product when using variants");
+
+        bool allowsCustomization = dto.Customization != null &&
+            (dto.Customization.AllowsPrinting || dto.Customization.AllowsText);
+
+        if (allowsCustomization &&
+            (dto.Customization.Zones == null || !dto.Customization.Zones.Any()))
+        {
+            return ServiceResult<ProductDto>.Failure("Customizable products must have at least one zone");
+        }
+
+        var category = await _unitOfWork.Categories.GetByIdAsync(dto.CategoryId);
+
+        // 🤖 AI
+        var aiRequest = new AiModerationRequestDto
+        {
+            ProductName = dto.ProductName,
+            Description = dto.Description,
+            Price = hasVariants ? dto.Variants.Min(v => v.Price) : dto.BasePrice,
+            Category = category?.CategoryName ?? "",
+            ImageUrl = dto.ImageUrls?.Split(',').FirstOrDefault()?.Trim()
+        };
+
+        var aiResult = await _aiModerationService.ModerateProductAsync(aiRequest);
+
+        var approvalStatus = aiResult.Status switch
+        {
+            "auto_approved" => ApprovalStatus.Approved,
+            "rejected" => ApprovalStatus.Rejected,
+            _ => ApprovalStatus.Pending
+        };
+
+        // 🧾 UPDATE CORE
+        product.ProductName = dto.ProductName;
+        product.Description = dto.Description;
+        product.ImageUrls = dto.ImageUrls;
+        product.CategoryId = dto.CategoryId;
+
+        product.BasePrice = hasVariants
+            ? dto.Variants.Min(v => v.Price)
+            : dto.BasePrice;
+
+        // ✅ أهم تعديل
+        product.StockQuantity = hasVariants
+            ? 0
+            : dto.StockQuantity!.Value;
+
+        product.AllowsCustomization = allowsCustomization;
+        product.AllowsPrinting = allowsCustomization && dto.Customization?.AllowsPrinting == true;
+        product.AllowsText = allowsCustomization && dto.Customization?.AllowsText == true;
+
+        product.UpdatedAt = DateTime.UtcNow;
+
+        product.ApprovalStatus = approvalStatus;
+        product.IsActive = approvalStatus == ApprovalStatus.Approved;
+        product.ApprovalDate = approvalStatus == ApprovalStatus.Approved ? DateTime.UtcNow : null;
+        product.RejectionReason = approvalStatus == ApprovalStatus.Rejected ? aiResult.Reason : null;
+
+        // 🔁 VARIANTS (replace)
+        var oldVariants = await _unitOfWork.ProductVariants
+            .FindAsync(v => v.ProductId == productId);
+
+        foreach (var v in oldVariants)
+            _unitOfWork.ProductVariants.Delete(v);
+
+        if (hasVariants)
+        {
+            foreach (var v in dto.Variants)
             {
-                var product = await _unitOfWork.Products
-                    .GetQueryable()
-                    .Include(p => p.Brand)
-                    .Include(p => p.Variants)
-                    .Include(p => p.CustomizationZones)
-                    .FirstOrDefaultAsync(p => p.ProductId == productId);
+                if (v.StockQuantity <= 0)
+                    return ServiceResult<ProductDto>.Failure("Variant stock must be greater than 0");
 
-                if (product == null)
-                    return ServiceResult<ProductDto>.Failure("Product not found");
-
-                if (product.Brand.UserId != userId)
-                    return ServiceResult<ProductDto>.Failure("You can only update your own products");
-
-                product.ProductName = dto.ProductName;
-                product.Description = dto.Description;
-                product.ImageUrls = dto.ImageUrls;
-                product.CategoryId = dto.CategoryId;
-                product.AllowsCustomization = dto.AllowsCustomization;
-                product.IsActive = dto.IsActive;
-                product.UpdatedAt = DateTime.UtcNow;
-
-                // لما يتعدل يرجع Pending عشان الـ AI يراجعه تاني
-                product.ApprovalStatus = ApprovalStatus.Pending;
-
-                // حذف الـ Variants القديمة وإضافة الجديدة
-                var oldVariants = await _unitOfWork.ProductVariants
-                    .FindAsync(v => v.ProductId == productId);
-                foreach (var v in oldVariants)
-                    _unitOfWork.ProductVariants.Delete(v);
-
-                foreach (var v in dto.Variants)
+                await _unitOfWork.ProductVariants.AddAsync(new ProductVariant
                 {
-                    await _unitOfWork.ProductVariants.AddAsync(new ProductVariant
-                    {
-                        ProductId = productId,
-                        Size = v.Size,
-                        Color = v.Color,
-                        Price = v.Price,
-                        StockQuantity = v.StockQuantity,
-                        SKU = v.SKU ?? $"{productId}-{v.Size}-{v.Color}"
-                    });
-                }
-
-                // تحديث الـ Customization Zones
-                var oldZones = await _unitOfWork.ProductCustomizationZones
-                    .FindAsync(z => z.ProductId == productId);
-                foreach (var z in oldZones)
-                    _unitOfWork.ProductCustomizationZones.Delete(z);
-
-                if (dto.AllowsCustomization)
-                {
-                    foreach (var zone in dto.CustomizationZones)
-                    {
-                        await _unitOfWork.ProductCustomizationZones.AddAsync(new ProductCustomizationZone
-                        {
-                            ProductId = productId,
-                            Zone = (CustomizationZone)zone,
-                            IsAvailable = true
-                        });
-                    }
-                }
-
-                _unitOfWork.Products.Update(product);
-                await _unitOfWork.SaveAsync();
-
-                return await GetProductByIdAsync(productId);
-            }
-            catch (Exception ex)
-            {
-                return ServiceResult<ProductDto>.Failure($"Error updating product: {ex.Message}");
+                    ProductId = productId,
+                    Size = v.Size,
+                    Color = v.Color,
+                    Price = v.Price,
+                    StockQuantity = v.StockQuantity,
+                    SKU = v.SKU ?? $"{productId}-{v.Size}-{v.Color}"
+                });
             }
         }
+
+        // 🎨 CUSTOMIZATION
+        var oldZones = await _unitOfWork.ProductCustomizationZones
+            .FindAsync(z => z.ProductId == productId);
+
+        foreach (var z in oldZones)
+            _unitOfWork.ProductCustomizationZones.Delete(z);
+
+        if (allowsCustomization)
+        {
+            foreach (var zone in dto.Customization.Zones)
+            {
+                await _unitOfWork.ProductCustomizationZones.AddAsync(new ProductCustomizationZone
+                {
+                    ProductId = productId,
+                    Zone = (CustomizationZone)zone,
+                    IsAvailable = true
+                });
+            }
+        }
+
+        await _unitOfWork.SaveAsync();
+
+        var productDto = await GetProductByIdAsync(productId);
+        if (!productDto.Succeeded)
+            return productDto;
+
+        var message = approvalStatus switch
+        {
+            ApprovalStatus.Approved => "تم تحديث المنتج ونُشر تلقائياً",
+            ApprovalStatus.Rejected => $"تم رفض التحديث: {aiResult.Reason}",
+            _ => "تم تحديث المنتج وهو في انتظار المراجعة"
+        };
+
+        return ServiceResult<ProductDto>.Success(productDto.Data, message);
+    }
+    catch (Exception ex)
+    {
+        return ServiceResult<ProductDto>.Failure(ex.ToString());
+    }
+}
 
         // Owner يحذف Product بتاعته
         public async Task<ServiceResult<bool>> DeleteProductAsync(int productId, int userId)
@@ -387,36 +524,49 @@ namespace Graduation_Project.BLL.Services.Implementations
             }
         }
 
-        private ProductDto MapToDto(Product product) => new ProductDto
+     private ProductDto MapToDto(Product product) => new ProductDto
+{
+    ProductId = product.ProductId,
+    BrandId = product.BrandId,
+    BrandName = product.Brand?.BrandName,
+    CategoryId = product.CategoryId,
+    CategoryName = product.Category?.CategoryName,
+    ProductName = product.ProductName,
+    Description = product.Description,
+    ImageUrls = product.ImageUrls,
+
+    AllowsCustomization = product.AllowsCustomization,
+
+    CustomizationOptions = product.AllowsCustomization ? new ProductCustomizationOptionsDto
+    {
+        AllowsPrinting = product.AllowsPrinting,
+        AllowsText = product.AllowsText,
+        AvailableZones = product.CustomizationZones?
+            .Where(z => z.IsAvailable)
+            .Select(z => ((CustomizationZone)z.Zone).ToString())
+            .ToList() ?? new()
+    } : null,
+
+    ApprovalStatus = product.ApprovalStatus,
+    ApprovalStatusText = product.ApprovalStatus.ToString(),
+    RejectionReason = product.RejectionReason,
+    CreatedAt = product.CreatedAt,
+    IsActive = product.IsActive,
+
+    AverageRating = product.AverageRating,
+    ReviewCount = product.ReviewCount,
+
+    BasePrice = product.BasePrice,
+
+    Variants = product.Variants?
+        .Select(v => new ProductVariantDto
         {
-            ProductId = product.ProductId,
-            BrandId = product.BrandId,
-            BrandName = product.Brand?.BrandName,
-            CategoryId = product.CategoryId,
-            CategoryName = product.Category?.CategoryName,
-            ProductName = product.ProductName,
-            Description = product.Description,
-            ImageUrls = product.ImageUrls,
-            AllowsCustomization = product.AllowsCustomization,
-            CustomizationZones = product.CustomizationZones?
-                .Select(z => z.Zone.ToString()).ToList() ?? new(),
-            ApprovalStatus = product.ApprovalStatus,
-            ApprovalStatusText = product.ApprovalStatus.ToString(),
-            RejectionReason = product.RejectionReason,
-            CreatedAt = product.CreatedAt,
-            IsActive = product.IsActive,
-            AverageRating = product.AverageRating,
-            ReviewCount = product.ReviewCount,
-            Variants = product.Variants?
-                .Select(v => new ProductVariantDto
-                {
-                    VariantId = v.VariantId,
-                    Size = v.Size,
-                    Color = v.Color,
-                    Price = v.Price,
-                    StockQuantity = v.StockQuantity,
-                    SKU = v.SKU
-                }).ToList() ?? new()
-        };
-    }
-}
+            VariantId = v.VariantId,
+            Size = v.Size,
+            Color = v.Color,
+            Price = v.Price,
+            StockQuantity = v.StockQuantity,
+            SKU = v.SKU
+        }).ToList() ?? new()
+};
+}}

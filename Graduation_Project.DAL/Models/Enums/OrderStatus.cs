@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Graduation_Project.DAL.Models.Enums
+﻿namespace Graduation_Project.DAL.Models.Enums
 {
     public enum OrderStatus
     {
@@ -12,7 +6,6 @@ namespace Graduation_Project.DAL.Models.Enums
         Processing = 2,
         Shipped = 3,
         Delivered = 4,
-        Cancelled = 5,
-        Rejected = 6
+        Cancelled = 5
     }
 }

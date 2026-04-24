@@ -5,7 +5,7 @@ namespace Graduation_Project.BLL.DTOs.Product
     public class CreateProductVariantDto
     {
         [Required]
-        public string Size { get; set; }  // S, M, L, XL, 2XL
+        public string Size { get; set; }
 
         public string Color { get; set; }
 

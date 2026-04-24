@@ -51,21 +51,6 @@ namespace Graduation_Project.Api.Controllers
             return Ok(result.Data);
         }
 
-        // Owner فقط يعمل Brand
-        [HttpPost]
-        [Authorize(Policy = "BrandOwnerOnly")]
-        public async Task<IActionResult> Create([FromBody] CreateBrandDto dto)
-        {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            var result = await _brandService.CreateBrandAsync(userId, dto);
-            if (!result.Succeeded)
-                return BadRequest(result.Errors);
-
-            return CreatedAtAction(nameof(GetById), new { id = result.Data.BrandId }, result.Data);
-        }
 
         // Owner يعدل Brand بتاعته
         [HttpPut("{id}")]

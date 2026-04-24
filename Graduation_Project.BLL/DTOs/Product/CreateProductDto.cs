@@ -17,13 +17,15 @@ namespace Graduation_Project.BLL.DTOs.Product
         [Required]
         public int CategoryId { get; set; }
 
-        public bool AllowsCustomization { get; set; } = false;
-
-        // الأحجام والأسعار
+        // الأحجام والأسعار - مستقلة تماماً عن الـ Customization
         [Required]
         public List<CreateProductVariantDto> Variants { get; set; }
+            public decimal BasePrice { get; set; } // 👈 الجديد
+    public int? StockQuantity { get; set; } // ✅ أضفناها هنا
 
-        // الأماكن المتاحة للطباعة (لو AllowsCustomization = true)
-        public List<int> CustomizationZones { get; set; } = new();
+
+        // الـ Customization اختياري بالكامل
+        // لو null يعني المنتج مش بيقبل customization
+        public CreateCustomizationOptionsDto Customization { get; set; } = null;
     }
 }

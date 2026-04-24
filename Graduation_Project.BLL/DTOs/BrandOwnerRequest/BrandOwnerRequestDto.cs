@@ -1,10 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Graduation_Project.DAL.Models.Enums;
-using System;
+﻿using Graduation_Project.DAL.Models.Enums;
+
 namespace Graduation_Project.BLL.DTOs.BrandOwnerRequest
 {
     public class BrandOwnerRequestDto
@@ -16,6 +11,13 @@ namespace Graduation_Project.BLL.DTOs.BrandOwnerRequest
         public string? BusinessName { get; set; }
         public string? BusinessLicense { get; set; }
         public string? TaxId { get; set; }
+
+        // ✅ بيانات البراند
+        public string? BrandName { get; set; }
+        public string? BrandDescription { get; set; }
+        public string? BrandLogoUrl { get; set; }
+        public int? CreatedBrandId { get; set; } // الـ ID بتاع البراند اللي اتعمل
+
         public RequestStatus RequestStatus { get; set; }
         public string? RequestStatusText { get; set; }
         public DateTime RequestDate { get; set; }

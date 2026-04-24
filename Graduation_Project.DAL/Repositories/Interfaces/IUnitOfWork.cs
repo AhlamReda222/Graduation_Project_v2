@@ -1,4 +1,5 @@
 ﻿using Graduation_Project.DAL.Models.Entities;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Graduation_Project.DAL.Repositories.Interfaces
 {
@@ -22,7 +23,7 @@ namespace Graduation_Project.DAL.Repositories.Interfaces
         IGenericRepository<ProductCustomizationZone> ProductCustomizationZones { get; }
         IGenericRepository<PrintingTechnique> PrintingTechniques { get; }
         IGenericRepository<OrderItemCustomization> OrderItemCustomizations { get; }
-
+        Task<IDbContextTransaction> BeginTransactionAsync();
         Task<int> SaveAsync();
     }
 }

@@ -6,7 +6,7 @@ namespace Graduation_Project.DAL.Models.Entities
     {
         public int ZoneId { get; set; }
         public int ProductId { get; set; }
-        public CustomizationZone Zone { get; set; }  // Front, Back, etc.
+        public CustomizationZone Zone { get; set; }
         public bool IsAvailable { get; set; } = true;
 
         // Navigation

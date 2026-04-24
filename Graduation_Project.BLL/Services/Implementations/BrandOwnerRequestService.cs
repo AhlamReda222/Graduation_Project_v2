@@ -34,6 +34,10 @@ namespace Graduation_Project.BLL.Services.Implementations
                 BusinessName = dto.BusinessName,
                 BusinessLicense = dto.BusinessLicense,
                 TaxId = dto.TaxId,
+                // ✅ بيانات البراند
+                BrandName = dto.BrandName,
+                BrandDescription = dto.BrandDescription,
+                BrandLogoUrl = dto.BrandLogoUrl,
                 RequestStatus = RequestStatus.Pending,
                 RequestDate = DateTime.UtcNow
             };
@@ -108,6 +112,7 @@ namespace Graduation_Project.BLL.Services.Implementations
             if (request.RequestStatus != RequestStatus.Pending)
                 throw new InvalidOperationException("Only pending requests can be approved");
 
+            // ✅ 1. حول الـ UserType
             request.RequestStatus = RequestStatus.Approved;
             request.ReviewedBy = adminId;
             request.ReviewDate = DateTime.UtcNow;
@@ -115,6 +120,18 @@ namespace Graduation_Project.BLL.Services.Implementations
             if (request.User != null)
                 request.User.UserType = UserType.BrandOwner;
 
+            // ✅ 2. اعمل البراند تلقائياً
+            var brand = new Brand
+            {
+                UserId = request.UserId,
+                BrandName = request.BrandName,
+                Description = request.BrandDescription,
+                LogoUrl = request.BrandLogoUrl,
+                CreatedAt = DateTime.UtcNow,
+                IsActive = true
+            };
+
+            await _unitOfWork.Brands.AddAsync(brand);
             _unitOfWork.BrandOwnerRequests.Update(request);
             await _unitOfWork.SaveAsync();
 
@@ -172,6 +189,9 @@ namespace Graduation_Project.BLL.Services.Implementations
                 BusinessName = request.BusinessName,
                 BusinessLicense = request.BusinessLicense,
                 TaxId = request.TaxId,
+                BrandName = request.BrandName,
+                BrandDescription = request.BrandDescription,
+                BrandLogoUrl = request.BrandLogoUrl,
                 RequestStatus = request.RequestStatus,
                 RequestStatusText = GetStatusText(request.RequestStatus),
                 RequestDate = request.RequestDate,

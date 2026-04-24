@@ -17,48 +17,6 @@ namespace Graduation_Project.BLL.Services.Implementations
             _unitOfWork = unitOfWork;
         }
 
-        public async Task<ServiceResult<BrandDto>> CreateBrandAsync(int userId, CreateBrandDto dto)
-        {
-            try
-            {
-                var user = await _unitOfWork.ApplicationUsers.GetByIdAsync(userId);
-                if (user == null)
-                    return ServiceResult<BrandDto>.Failure("User not found");
-
-                if (user.UserType != UserType.BrandOwner)
-                    return ServiceResult<BrandDto>.Failure("Only brand owners can create brands");
-
-
-                if (!user.HasAcceptedContract)
-                    return ServiceResult<BrandDto>.Failure("You must accept the contract before creating a brand");
-
-
-                var nameExists = await _unitOfWork.Brands
-                    .AnyAsync(b => b.BrandName.ToLower() == dto.BrandName.ToLower() && b.UserId == userId);
-
-                if (nameExists)
-                    return ServiceResult<BrandDto>.Failure("You already have a brand with this name");
-
-                var brand = new Brand
-                {
-                    UserId = userId,
-                    BrandName = dto.BrandName,
-                    Description = dto.Description,
-                    LogoUrl = dto.LogoUrl,
-                    CreatedAt = DateTime.UtcNow,
-                    IsActive = true
-                };
-
-                await _unitOfWork.Brands.AddAsync(brand);
-                await _unitOfWork.SaveAsync();
-
-                return await GetBrandByIdAsync(brand.BrandId);
-            }
-            catch (Exception ex)
-            {
-                return ServiceResult<BrandDto>.Failure($"Error creating brand: {ex.Message}");
-            }
-        }
 
         public async Task<ServiceResult<BrandDto>> GetBrandByIdAsync(int brandId)
         {

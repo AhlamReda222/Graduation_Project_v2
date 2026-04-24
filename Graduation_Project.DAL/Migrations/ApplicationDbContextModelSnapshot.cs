@@ -183,6 +183,18 @@ namespace Graduation_Project.DAL.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("RequestId"));
 
+                    b.Property<string>("BrandDescription")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("BrandLogoUrl")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("BrandName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("BusinessLicense")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -243,6 +255,15 @@ namespace Graduation_Project.DAL.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("NOW()");
 
+                    b.Property<int?>("CustomizationZone")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("DesignImageUrl")
+                        .HasColumnType("text");
+
+                    b.Property<string>("DesignText")
+                        .HasColumnType("text");
+
                     b.Property<int>("ProductId")
                         .HasColumnType("integer");
 
@@ -251,15 +272,24 @@ namespace Graduation_Project.DAL.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(1);
 
+                    b.Property<string>("Signature")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int?>("TechniqueId")
+                        .HasColumnType("integer");
+
                     b.Property<int>("UserId")
                         .HasColumnType("integer");
 
-                    b.Property<int>("VariantId")
+                    b.Property<int?>("VariantId")
                         .HasColumnType("integer");
 
                     b.HasKey("CartItemId");
 
                     b.HasIndex("ProductId");
+
+                    b.HasIndex("TechniqueId");
 
                     b.HasIndex("VariantId");
 
@@ -509,7 +539,7 @@ namespace Graduation_Project.DAL.Migrations
                     b.Property<decimal>("UnitPrice")
                         .HasColumnType("decimal(10,2)");
 
-                    b.Property<int>("VariantId")
+                    b.Property<int?>("VariantId")
                         .HasColumnType("integer");
 
                     b.HasKey("OrderItemId");
@@ -613,6 +643,12 @@ namespace Graduation_Project.DAL.Migrations
                     b.Property<bool>("AllowsCustomization")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("AllowsPrinting")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("AllowsText")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime?>("ApprovalDate")
                         .HasColumnType("timestamp with time zone");
 
@@ -628,6 +664,9 @@ namespace Graduation_Project.DAL.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("decimal(3,2)")
                         .HasDefaultValue(0.00m);
+
+                    b.Property<decimal>("BasePrice")
+                        .HasColumnType("numeric");
 
                     b.Property<int>("BrandId")
                         .HasColumnType("integer");
@@ -659,13 +698,15 @@ namespace Graduation_Project.DAL.Migrations
                         .HasColumnType("character varying(200)");
 
                     b.Property<string>("RejectionReason")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<int>("ReviewCount")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasDefaultValue(0);
+
+                    b.Property<int>("StockQuantity")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
@@ -1064,6 +1105,10 @@ namespace Graduation_Project.DAL.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Graduation_Project.DAL.Models.Entities.PrintingTechnique", "Technique")
+                        .WithMany()
+                        .HasForeignKey("TechniqueId");
+
                     b.HasOne("Graduation_Project.DAL.Models.Entities.ApplicationUser", "User")
                         .WithMany("CartItems")
                         .HasForeignKey("UserId")
@@ -1073,12 +1118,13 @@ namespace Graduation_Project.DAL.Migrations
                     b.HasOne("Graduation_Project.DAL.Models.Entities.ProductVariant", "ProductVariant")
                         .WithMany("CartItems")
                         .HasForeignKey("VariantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Product");
 
                     b.Navigation("ProductVariant");
+
+                    b.Navigation("Technique");
 
                     b.Navigation("User");
                 });
@@ -1160,8 +1206,7 @@ namespace Graduation_Project.DAL.Migrations
                     b.HasOne("Graduation_Project.DAL.Models.Entities.ProductVariant", "ProductVariant")
                         .WithMany("OrderItems")
                         .HasForeignKey("VariantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Order");
 

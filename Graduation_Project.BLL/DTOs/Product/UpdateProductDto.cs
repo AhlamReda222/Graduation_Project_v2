@@ -20,6 +20,10 @@ namespace Graduation_Project.BLL.DTOs.Product
         public bool IsActive { get; set; }
 
         public List<CreateProductVariantDto> Variants { get; set; }
+            public CreateCustomizationOptionsDto? Customization { get; set; }
+
+public decimal BasePrice { get; set; }
+    public int? StockQuantity { get; set; } // ✅ لازم تضيفيها
 
         public List<int> CustomizationZones { get; set; } = new();
     }

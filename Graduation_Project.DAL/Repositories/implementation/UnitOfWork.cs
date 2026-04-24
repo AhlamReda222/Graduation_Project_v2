@@ -1,7 +1,7 @@
 ﻿using Graduation_Project.DAL.DataBase;
 using Graduation_Project.DAL.Models.Entities;
 using Graduation_Project.DAL.Repositories.Interfaces;
-
+using Microsoft.EntityFrameworkCore.Storage;
 namespace Graduation_Project.DAL.Repositories.Implementations
 {
     public class UnitOfWork : IUnitOfWork
@@ -53,5 +53,10 @@ namespace Graduation_Project.DAL.Repositories.Implementations
 
         public async Task<int> SaveAsync()
             => await _context.SaveChangesAsync();
+
+            public async Task<IDbContextTransaction> BeginTransactionAsync()
+{
+    return await _context.Database.BeginTransactionAsync();
+}
     }
 }
