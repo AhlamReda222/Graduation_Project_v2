@@ -109,7 +109,12 @@ builder.Services.AddScoped<IFileService, FileService>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
-        policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+    {
+        policy
+            .AllowAnyOrigin()
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
 });
 builder.Services.AddControllers();
 
@@ -121,6 +126,7 @@ using (var scope = app.Services.CreateScope())
     await PrintingTechniqueSeeder.SeedAsync(scope.ServiceProvider); 
 
 }
+
 #endregion
 
 #region Middleware Pipeline

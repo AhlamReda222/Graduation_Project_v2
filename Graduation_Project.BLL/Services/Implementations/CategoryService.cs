@@ -4,6 +4,8 @@ using Graduation_Project.BLL.Services.Interfaces;
 using Graduation_Project.DAL.Repositories.Interfaces;
 using Graduation_Project.DAL.Models.Entities;
 using Microsoft.EntityFrameworkCore;
+using Graduation_Project.BLL.Mappers;
+using Graduation_Project.DAL.Models.Enums;
 
 namespace Graduation_Project.BLL.Services.Implementations
 {
@@ -50,34 +52,42 @@ namespace Graduation_Project.BLL.Services.Implementations
                 return ServiceResult<CategoryDto>.Failure($"Error creating category: {ex.Message}");
             }
         }
+public async Task<ServiceResult<CategoryDto>> GetCategoryByIdAsync(int categoryId)
+{
+    try
+    {
+        var category = await _unitOfWork.Categories
+            .GetQueryable()
+            .Include(c => c.Products)
+                .ThenInclude(p => p.Brand)
+            .Include(c => c.Products)
+                .ThenInclude(p => p.Variants)
+            .FirstOrDefaultAsync(c => c.CategoryId == categoryId);
 
-        public async Task<ServiceResult<CategoryDto>> GetCategoryByIdAsync(int categoryId)
+        if (category == null)
+            return ServiceResult<CategoryDto>.Failure("Category not found");
+
+        var result = new CategoryDto
         {
-            try
-            {
-                var category = await _unitOfWork.Categories
-                    .GetQueryable()
-                    .Include(c => c.Products)
-                    .FirstOrDefaultAsync(c => c.CategoryId == categoryId);
+            CategoryId = category.CategoryId,
+            CategoryName = category.CategoryName,
+            Description = category.Description,
 
-                if (category == null)
-                    return ServiceResult<CategoryDto>.Failure("Category not found");
+            ProductCount = category.Products?.Count ?? 0,
 
-                var result = new CategoryDto
-                {
-                    CategoryId = category.CategoryId,
-                    CategoryName = category.CategoryName,
-                    Description = category.Description,
-                    ProductCount = category.Products?.Count ?? 0
-                };
+          Products = category.Products?
+    .Where(p => p.IsActive && p.ApprovalStatus == ApprovalStatus.Approved)
+    .Select(p => ProductMapper.MapToDto(p))
+    .ToList() ?? new()
+        };
 
-                return ServiceResult<CategoryDto>.Success(result);
-            }
-            catch (Exception ex)
-            {
-                return ServiceResult<CategoryDto>.Failure($"Error fetching category: {ex.Message}");
-            }
-        }
+        return ServiceResult<CategoryDto>.Success(result);
+    }
+    catch (Exception ex)
+    {
+        return ServiceResult<CategoryDto>.Failure($"Error fetching category: {ex.Message}");
+    }
+}
 
         public async Task<ServiceResult<CategoryDto>> UpdateCategoryAsync(int categoryId, UpdateCategoryDto dto, int adminId)
         {

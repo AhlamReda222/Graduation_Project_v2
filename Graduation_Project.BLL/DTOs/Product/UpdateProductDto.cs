@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http;
 
 namespace Graduation_Project.BLL.DTOs.Product
 {
@@ -11,8 +12,7 @@ namespace Graduation_Project.BLL.DTOs.Product
         [MaxLength(1000)]
         public string Description { get; set; }
 
-        public string ImageUrls { get; set; }
-
+        public List<IFormFile>? Images { get; set; }
         public int CategoryId { get; set; }
 
         public bool AllowsCustomization { get; set; }

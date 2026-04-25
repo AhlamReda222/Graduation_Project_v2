@@ -1,3 +1,4 @@
+using Graduation_Project.BLL.DTOs.Product;
 namespace Graduation_Project.BLL.DTOs.Brand
 {
     public class BrandDto
@@ -11,5 +12,6 @@ namespace Graduation_Project.BLL.DTOs.Brand
         public DateTime CreatedAt { get; set; }
         public bool IsActive { get; set; }
         public int ProductCount { get; set; }
+        public List<ProductDto> Products { get; set; } = new();
     }
 }

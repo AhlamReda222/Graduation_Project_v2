@@ -74,28 +74,39 @@ namespace Graduation_Project.API.Controllers
         }
 
         // Owner يضيف Product
-        [HttpPost("brand/{brandId}")]
-        [Authorize(Policy = "BrandOwnerOnly")]
-        public async Task<IActionResult> Create(int brandId, [FromBody] CreateProductDto dto)
-        {
-            if (!ModelState.IsValid) return BadRequest(ModelState);
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            var result = await _productService.CreateProductAsync(userId, brandId, dto);
-            if (!result.Succeeded) return BadRequest(result.Errors);
-            return CreatedAtAction(nameof(GetById), new { id = result.Data.ProductId }, result.Data);
-        }
+     [HttpPost("brand/{brandId}")]
+[Authorize(Policy = "BrandOwnerOnly")]
+public async Task<IActionResult> Create(int brandId, [FromForm] CreateProductDto dto)
+{
+    if (!ModelState.IsValid)
+        return BadRequest(ModelState);
 
-        // Owner يعدل Product
-        [HttpPut("{id}")]
-        [Authorize(Policy = "BrandOwnerOnly")]
-        public async Task<IActionResult> Update(int id, [FromBody] UpdateProductDto dto)
-        {
-            if (!ModelState.IsValid) return BadRequest(ModelState);
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            var result = await _productService.UpdateProductAsync(id, userId, dto);
-            if (!result.Succeeded) return BadRequest(result.Errors);
-            return Ok(result.Data);
-        }
+    var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+    var result = await _productService.CreateProductAsync(userId, brandId, dto);
+
+    if (!result.Succeeded)
+        return BadRequest(result.Errors);
+
+    return CreatedAtAction(nameof(GetById), new { id = result.Data.ProductId }, result.Data);
+}
+
+       [HttpPut("{id}")]
+[Authorize(Policy = "BrandOwnerOnly")]
+public async Task<IActionResult> Update(int id, [FromForm] UpdateProductDto dto)
+{
+    if (!ModelState.IsValid)
+        return BadRequest(ModelState);
+
+    var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+    var result = await _productService.UpdateProductAsync(id, userId, dto);
+
+    if (!result.Succeeded)
+        return BadRequest(result.Errors);
+
+    return Ok(result.Data);
+}
 
         // Owner يحذف Product
         [HttpDelete("{id}")]

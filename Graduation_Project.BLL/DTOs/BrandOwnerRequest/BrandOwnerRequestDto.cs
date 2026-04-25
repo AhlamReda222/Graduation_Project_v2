@@ -11,12 +11,11 @@ namespace Graduation_Project.BLL.DTOs.BrandOwnerRequest
         public string? UserEmail { get; set; }
         public string? BusinessName { get; set; }
         public string? BusinessLicense { get; set; }
-        public string? TaxId { get; set; }
 
         // ✅ بيانات البراند
         public string? BrandName { get; set; }
         public string? BrandDescription { get; set; }
-        public string? BrandLogoUrl { get; set; }
+        public string? BrandLogo { get; set; }
         public int? CreatedBrandId { get; set; } // الـ ID بتاع البراند اللي اتعمل
 
         public RequestStatus RequestStatus { get; set; }

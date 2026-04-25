@@ -203,7 +203,7 @@ namespace Graduation_Project.BLL.Services.Implementations
                 BusinessLicense = request.BusinessLicense,
                 BrandName = request.BrandName,
                 BrandDescription = request.BrandDescription,
-                BrandLogoUrl = request.BrandLogoUrl,
+                BrandLogo = request.BrandLogoUrl,
                 RequestStatus = request.RequestStatus,
                 RequestStatusText = GetStatusText(request.RequestStatus),
                 RequestDate = request.RequestDate,

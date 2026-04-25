@@ -5,7 +5,7 @@ using Graduation_Project.DAL.Models.Entities;
 using Graduation_Project.DAL.Models.Enums;
 using Graduation_Project.DAL.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
-
+using Graduation_Project.BLL.Mappers;
 namespace Graduation_Project.BLL.Services.Implementations
 {
     public class BrandService : IBrandService
@@ -26,7 +26,9 @@ namespace Graduation_Project.BLL.Services.Implementations
                     .GetQueryable()
                     .Include(b => b.User)
                     .Include(b => b.Products)
+                                .ThenInclude(p => p.Variants) // 👈 يتحط هنا
                     .FirstOrDefaultAsync(b => b.BrandId == brandId);
+                    
 
                 if (brand == null)
                     return ServiceResult<BrandDto>.Failure("Brand not found");
@@ -175,18 +177,21 @@ namespace Graduation_Project.BLL.Services.Implementations
                 return ServiceResult<bool>.Failure($"Error toggling brand status: {ex.Message}");
             }
         }
+    
+    private BrandDto MapToDto(Brand brand)
+{
+    return new BrandDto
+    {
+        BrandId = brand.BrandId,
+        BrandName = brand.BrandName,
+        Description = brand.Description,
+        IsActive = brand.IsActive,
+        OwnerName = brand.User?.FullName,
 
-        private BrandDto MapToDto(Brand brand) => new BrandDto
-        {
-            BrandId = brand.BrandId,
-            UserId = brand.UserId,
-            OwnerName = brand.User?.FullName,
-            BrandName = brand.BrandName,
-            Description = brand.Description,
-            LogoUrl = brand.LogoUrl,
-            CreatedAt = brand.CreatedAt,
-            IsActive = brand.IsActive,
-            ProductCount = brand.Products?.Count ?? 0
-        };
-    }
+        Products = brand.Products?
+            .Where(p => p.IsActive && p.ApprovalStatus == ApprovalStatus.Approved) // 👈 مهم
+            .Select(p => ProductMapper.MapToDto(p)) // 👈 من الـ Mapper
+            .ToList() ?? new()
+    };
 }
+}}

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http;
 
 namespace Graduation_Project.BLL.DTOs.Product
 {
@@ -12,13 +13,12 @@ namespace Graduation_Project.BLL.DTOs.Product
         public string Description { get; set; }
 
         [Required]
-        public string ImageUrls { get; set; }
+            public List<IFormFile>? Images { get; set; }
 
         [Required]
         public int CategoryId { get; set; }
 
         // الأحجام والأسعار - مستقلة تماماً عن الـ Customization
-        [Required]
         public List<CreateProductVariantDto> Variants { get; set; }
             public decimal BasePrice { get; set; } // 👈 الجديد
     public int? StockQuantity { get; set; } // ✅ أضفناها هنا
