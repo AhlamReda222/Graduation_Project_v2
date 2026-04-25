@@ -8,7 +8,7 @@ namespace Graduation_Project.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize] // كل ال endpoints محتاجة authentication
+    [Authorize]
     public class BrandOwnerRequestController : ControllerBase
     {
         private readonly IBrandOwnerRequestService _service;
@@ -17,16 +17,20 @@ namespace Graduation_Project.Api.Controllers
         {
             _service = service;
         }
+
+        // ✅ Create Request (Files + FormData)
         [HttpPost("request-owner")]
-        [Authorize(Policy = "CustomerOnly")] // تستخدم الـ Policy بدل الـ Role
-public async Task<IActionResult> CreateRequest([FromBody] CreateBrandOwnerRequestDto dto)
+        [Authorize(Policy = "CustomerOnly")]
+        public async Task<IActionResult> CreateRequest([FromForm] CreateBrandOwnerRequestDto dto)
         {
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
             var result = await _service.CreateRequestAsync(userId, dto);
+
             return Ok(result);
         }
 
-        // Admin يشوف كل الطلبات
+        // ✅ Admin - Get All Requests
         [HttpGet]
         [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> GetAll()
@@ -35,7 +39,7 @@ public async Task<IActionResult> CreateRequest([FromBody] CreateBrandOwnerReques
             return Ok(result);
         }
 
-        // Admin يشوف الطلبات المعلقة
+        // ✅ Admin - Get Pending Requests
         [HttpGet("pending")]
         [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> GetPending()
@@ -44,43 +48,53 @@ public async Task<IActionResult> CreateRequest([FromBody] CreateBrandOwnerReques
             return Ok(result);
         }
 
-        // Admin يوافق على طلب
+        // ✅ Admin - Approve Request
         [HttpPut("{requestId}/approve")]
         [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> Approve(int requestId)
         {
             var adminId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
             var result = await _service.ApproveRequestAsync(requestId, adminId);
+
             return Ok(result);
         }
 
-        // Admin يرفض طلب
+        // ✅ Admin - Reject Request
         [HttpPut("{requestId}/reject")]
         [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> Reject(int requestId)
         {
             var adminId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
             var result = await _service.RejectRequestAsync(requestId, adminId);
+
             return Ok(result);
         }
 
-        // Customer يشوف طلباته
+        // ✅ Customer - My Requests
         [HttpGet("my-requests")]
-[Authorize(Policy = "CustomerOnly")]
+        [Authorize(Policy = "CustomerOnly")]
         public async Task<IActionResult> GetMyRequests()
         {
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
             var result = await _service.GetUserRequestsAsync(userId);
+
             return Ok(result);
         }
 
-        // Admin يحذف طلب
+        // ✅ Admin - Delete Request
         [HttpDelete("{requestId}")]
         [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> Delete(int requestId)
         {
             var result = await _service.DeleteRequestAsync(requestId);
-            return result ? Ok(new { message = "Deleted successfully" }) : NotFound();
+
+            if (!result)
+                return NotFound(new { message = "Request not found" });
+
+            return Ok(new { message = "Deleted successfully" });
         }
     }
 }

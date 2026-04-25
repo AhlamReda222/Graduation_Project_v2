@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
-
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Abstractions;
 namespace Graduation_Project.BLL.DTOs.BrandOwnerRequest
 {
     public class CreateBrandOwnerRequestDto
@@ -10,9 +11,8 @@ namespace Graduation_Project.BLL.DTOs.BrandOwnerRequest
         public string BusinessName { get; set; }
 
         [Required(ErrorMessage = "Business license is required")]
-        [MaxLength(500)]
-        public string BusinessLicense { get; set; }
-
+public IFormFile BusinessLicense { get; set; }
+public IFormFile BrandLogo { get; set; }
 
         // ✅ بيانات البراند في نفس الطلب
         [Required(ErrorMessage = "Brand name is required")]
@@ -22,6 +22,5 @@ namespace Graduation_Project.BLL.DTOs.BrandOwnerRequest
         [MaxLength(500)]
         public string BrandDescription { get; set; }
 
-        public string BrandLogoUrl { get; set; }
     }
 }

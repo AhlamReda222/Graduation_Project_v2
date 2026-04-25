@@ -10,10 +10,12 @@ namespace Graduation_Project.BLL.Services.Implementations
     public class BrandOwnerRequestService : IBrandOwnerRequestService
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly IFileService _fileService;
 
-        public BrandOwnerRequestService(IUnitOfWork unitOfWork)
+        public BrandOwnerRequestService(IUnitOfWork unitOfWork, IFileService fileService)
         {
             _unitOfWork = unitOfWork;
+            _fileService = fileService;
         }
 
         public async Task<BrandOwnerRequestDto> CreateRequestAsync(int userId, CreateBrandOwnerRequestDto dto)
@@ -28,15 +30,28 @@ namespace Graduation_Project.BLL.Services.Implementations
             if (user.UserType == UserType.BrandOwner)
                 throw new InvalidOperationException("You are already a brand owner");
 
+            // ✅ رفع License (ملف)
+            string? licenseUrl = null;
+            if (dto.BusinessLicense != null)
+            {
+                licenseUrl = await _fileService.UploadFileAsync(dto.BusinessLicense, "licenses");
+            }
+
+            // ✅ رفع Logo (صورة)
+            string? logoUrl = null;
+            if (dto.BrandLogo != null)
+            {
+                logoUrl = await _fileService.UploadFileAsync(dto.BrandLogo, "logos");
+            }
+
             var request = new BrandOwnerRequest
             {
                 UserId = userId,
                 BusinessName = dto.BusinessName,
-                BusinessLicense = dto.BusinessLicense,
-                // ✅ بيانات البراند
+                BusinessLicense = licenseUrl,
                 BrandName = dto.BrandName,
                 BrandDescription = dto.BrandDescription,
-                BrandLogoUrl = dto.BrandLogoUrl,
+                BrandLogoUrl = logoUrl,
                 RequestStatus = RequestStatus.Pending,
                 RequestDate = DateTime.UtcNow
             };
@@ -111,7 +126,6 @@ namespace Graduation_Project.BLL.Services.Implementations
             if (request.RequestStatus != RequestStatus.Pending)
                 throw new InvalidOperationException("Only pending requests can be approved");
 
-            // ✅ 1. حول الـ UserType
             request.RequestStatus = RequestStatus.Approved;
             request.ReviewedBy = adminId;
             request.ReviewDate = DateTime.UtcNow;
@@ -119,7 +133,7 @@ namespace Graduation_Project.BLL.Services.Implementations
             if (request.User != null)
                 request.User.UserType = UserType.BrandOwner;
 
-            // ✅ 2. اعمل البراند تلقائياً
+            // ✅ إنشاء البراند
             var brand = new Brand
             {
                 UserId = request.UserId,

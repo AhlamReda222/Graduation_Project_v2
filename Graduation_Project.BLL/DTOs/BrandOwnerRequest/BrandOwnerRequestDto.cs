@@ -1,4 +1,5 @@
 ﻿using Graduation_Project.DAL.Models.Enums;
+using Microsoft.AspNetCore.Http;
 
 namespace Graduation_Project.BLL.DTOs.BrandOwnerRequest
 {
