@@ -1,4 +1,5 @@
 ﻿using Graduation_Project.DAL.Models.Entities;
+using Graduation_Project.DAL.Models.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using System;
@@ -6,7 +7,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-
 namespace Graduation_Project.DAL.Configurations
 {
     public class ConversationConfiguration : IEntityTypeConfiguration<Conversation>
@@ -28,7 +28,7 @@ namespace Graduation_Project.DAL.Configurations
 
             builder.Property(c => c.CreatedAt)
                 .IsRequired()
-                .HasDefaultValueSql("NOW()");
+                .HasDefaultValueSql("(NOW())");
 
             // Composite Unique Index
             builder.HasIndex(c => new { c.CustomerId, c.BrandOwnerId })

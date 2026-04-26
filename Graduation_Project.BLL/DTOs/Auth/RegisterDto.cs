@@ -14,5 +14,6 @@ namespace Graduation_Project.BLL.DTOs.Auth
         [Required]
         [MinLength(6)]
         public string? Password { get; set; }
+        
     }
 }

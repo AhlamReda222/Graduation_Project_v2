@@ -27,8 +27,8 @@ namespace Graduation_Project.BLL.Services.Implementations
             if (await HasPendingRequestAsync(userId))
                 throw new InvalidOperationException("You already have a pending request");
 
-            if (user.UserType == UserType.BrandOwner)
-                throw new InvalidOperationException("You are already a brand owner");
+          //  if (user.UserType == UserType.BrandOwner)
+             //   throw new InvalidOperationException("You are already a brand owner");
 
             // ✅ رفع License (ملف)
             string? licenseUrl = null;

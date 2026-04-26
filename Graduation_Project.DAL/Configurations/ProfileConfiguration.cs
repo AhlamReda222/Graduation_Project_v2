@@ -29,7 +29,7 @@ namespace Graduation_Project.DAL.Configurations
 
             builder.Property(p => p.UpdatedAt)
                 .IsRequired()
-                .HasDefaultValueSql("NOW()");
+                .HasDefaultValueSql("(NOW())");
 
             builder.HasIndex(p => p.UserId)
                 .IsUnique()

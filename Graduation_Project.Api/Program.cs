@@ -11,6 +11,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.OpenApi.Models;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Graduation_Project.Api.Services;
+using Graduation_Project.Api.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -104,7 +106,14 @@ builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IFileService, FileService>();
-
+builder.Services.AddSignalR();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<INotificationHub, NotificationHubService>();
+builder.Services.AddScoped<IEmailSender, EmailSender>();
+builder.Services.AddScoped<IInAppEmailService, InAppEmailService>();
+builder.Services.AddScoped<IInAppEmailService, InAppEmailService>();
+builder.Services.AddScoped<IChatService, ChatService>();
+builder.Services.AddScoped<IProfileService, ProfileService>();
 // CORS
 builder.Services.AddCors(options =>
 {
@@ -143,6 +152,8 @@ app.UseCors("AllowAll");
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapHub<NotificationHub>("/hubs/notifications");
+app.MapHub<ChatHub>("/hubs/chat");
 
 app.MapControllers();
 

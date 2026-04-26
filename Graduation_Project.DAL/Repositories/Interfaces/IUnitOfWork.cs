@@ -23,6 +23,10 @@ namespace Graduation_Project.DAL.Repositories.Interfaces
         IGenericRepository<ProductCustomizationZone> ProductCustomizationZones { get; }
         IGenericRepository<PrintingTechnique> PrintingTechniques { get; }
         IGenericRepository<OrderItemCustomization> OrderItemCustomizations { get; }
+         IGenericRepository<Notification> Notifications { get; }
+        IGenericRepository<InAppEmail> InAppEmails { get; }
+        IGenericRepository<PasswordResetCode> PasswordResetCodes { get; }
+
         Task<IDbContextTransaction> BeginTransactionAsync();
         Task<int> SaveAsync();
     }

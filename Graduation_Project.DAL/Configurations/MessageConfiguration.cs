@@ -1,4 +1,5 @@
 ﻿using Graduation_Project.DAL.Models.Entities;
+using Graduation_Project.DAL.Models.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using System;
@@ -6,7 +7,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-
 namespace Graduation_Project.DAL.Configurations
 {
     public class MessageConfiguration : IEntityTypeConfiguration<Message>
@@ -32,7 +32,7 @@ namespace Graduation_Project.DAL.Configurations
 
             builder.Property(m => m.SentAt)
                 .IsRequired()
-                .HasDefaultValueSql("NOW()");
+                .HasDefaultValueSql("(NOW())");
 
             builder.Property(m => m.IsRead)
                 .IsRequired()

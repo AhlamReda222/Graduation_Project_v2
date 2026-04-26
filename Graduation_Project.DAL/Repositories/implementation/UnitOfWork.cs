@@ -23,6 +23,10 @@ namespace Graduation_Project.DAL.Repositories.Implementations
         public IGenericRepository<Message> Messages { get; }
         public IGenericRepository<Profile> Profiles { get; }
         
+        public IGenericRepository<Notification> Notifications { get; }
+        public IGenericRepository<InAppEmail> InAppEmails { get; }
+        public IGenericRepository<PasswordResetCode> PasswordResetCodes { get; }
+
         public IGenericRepository<ProductVariant> ProductVariants { get; }
         public  IGenericRepository<ProductCustomizationZone> ProductCustomizationZones { get; }
         public IGenericRepository<PrintingTechnique> PrintingTechniques { get; }
@@ -49,6 +53,9 @@ namespace Graduation_Project.DAL.Repositories.Implementations
             ProductCustomizationZones = new GenericRepository<ProductCustomizationZone>(_context);
             PrintingTechniques = new GenericRepository<PrintingTechnique>(_context);
             OrderItemCustomizations = new GenericRepository<OrderItemCustomization>(_context);
+               Notifications = new GenericRepository<Notification>(_context);
+            InAppEmails = new GenericRepository<InAppEmail>(_context);
+            PasswordResetCodes = new GenericRepository<PasswordResetCode>(_context);
         }
 
         public async Task<int> SaveAsync()

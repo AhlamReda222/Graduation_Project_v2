@@ -26,24 +26,48 @@ namespace Graduation_Project.Api.Controllers
         public async Task<IActionResult> Login([FromBody] LoginDto dto)
         {
             var result = await _authService.LoginAsync(dto);
-            return result.IsSuccess ? Ok(result) : Unauthorized(result);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
         }
 
-        [HttpPost("refresh")]
-        public async Task<IActionResult> Refresh([FromBody] RefreshTokenDto dto)
+        [HttpPost("google-login")]
+        public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginDto dto)
+        {
+            var result = await _authService.GoogleLoginAsync(dto);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
+        }
+
+        // ── Forgot Password: اليوزر بيدخل الإيميل ويستقبل Code ──
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
+        {
+            await _authService.ForgotPasswordAsync(dto);
+            // دايماً بنرجع Ok عشان مش نقول للـ hacker إن الإيميل موجود أو لأ
+            return Ok(new { message = "If this email exists, a reset code has been sent." });
+        }
+
+        // ── Reset Password: اليوزر بيدخل الـ Code والـ Password الجديد ──
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
+        {
+            var result = await _authService.ResetPasswordAsync(dto);
+            if (!result)
+                return BadRequest(new { message = "Invalid or expired code." });
+
+            return Ok(new { message = "Password reset successfully." });
+        }
+
+        [HttpPost("refresh-token")]
+        public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenDto dto)
         {
             var result = await _authService.RefreshTokenAsync(dto.RefreshToken);
-            return result.IsSuccess ? Ok(result) : Unauthorized(result);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
         }
 
         [HttpPost("logout")]
-        public async Task<IActionResult> Logout([FromBody] RefreshTokenDto dto)
+        public async Task<IActionResult> Logout([FromBody] LogoutDto dto)
         {
             await _authService.LogoutAsync(dto.RefreshToken);
             return Ok(new { message = "Logged out successfully" });
         }
-        
-        
     }
-    
 }

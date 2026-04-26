@@ -27,7 +27,9 @@ namespace Graduation_Project.DAL.DataBase
         public DbSet<Conversation> Conversations { get; set; }
         public DbSet<Message> Messages { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
-
+          public DbSet<Notification> Notifications { get; set; }
+        public DbSet<InAppEmail> InAppEmails { get; set; }
+        public DbSet<PasswordResetCode> PasswordResetCodes { get; set; }
         public DbSet<ProductVariant> ProductVariants { get; set; }
         public DbSet<ProductCustomizationZone> ProductCustomizationZones { get; set; }
         public DbSet<PrintingTechnique> PrintingTechniques { get; set; }
