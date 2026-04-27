@@ -19,7 +19,7 @@ namespace Graduation_Project.API.Controllers
             _orderService = orderService;
         }
 
-        // Customer يعمل Order من الكارت
+        // Customer يعمل Order ويدفع في نفس الوقت
         [HttpPost]
         [Authorize(Policy = "CustomerOnly")]
         public async Task<IActionResult> CreateOrder([FromBody] CreateOrderDto dto)
@@ -64,9 +64,9 @@ namespace Graduation_Project.API.Controllers
             return Ok(result.Data);
         }
 
-        // Admin يشوف كل الـ Orders
+        // owner يشوف كل الـ Orders
         [HttpGet]
-        [Authorize(Policy = "AdminOnly")]
+        [Authorize(Policy = "BrandOwnerOnly")]
         public async Task<IActionResult> GetAllOrders()
         {
             var result = await _orderService.GetAllOrdersAsync();
@@ -76,7 +76,7 @@ namespace Graduation_Project.API.Controllers
 
         // Admin يعدل Status
         [HttpPut("{orderId}/status")]
-        [Authorize(Policy = "AdminOnly")]
+        [Authorize(Policy = "BrandOwnerOnly")]
         public async Task<IActionResult> UpdateStatus(int orderId, [FromQuery] OrderStatus status)
         {
             var result = await _orderService.UpdateOrderStatusAsync(orderId, status);
@@ -85,4 +85,3 @@ namespace Graduation_Project.API.Controllers
         }
     }
 }
-

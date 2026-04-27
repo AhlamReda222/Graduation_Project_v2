@@ -17,148 +17,156 @@ namespace Graduation_Project.BLL.Services.Implementations
             _unitOfWork = unitOfWork;
         }
 
-     public async Task<ServiceResult<OrderDto>> CreateOrderFromCartAsync(int userId, CreateOrderDto dto)
-{
-    using var transaction = await _unitOfWork.BeginTransactionAsync(); // 👈 لازم تضيفيها في UoW
-
-    try
-    {
-        // 1️⃣ جيب الكارت
-        var cartItems = await _unitOfWork.CartItems
-            .GetQueryable()
-            .Include(c => c.Product)
-            .Include(c => c.ProductVariant)
-            .Include(c => c.Technique)
-            .Where(c => c.UserId == userId)
-            .ToListAsync();
-
-        if (!cartItems.Any())
-            return ServiceResult<OrderDto>.Failure("Cart is empty");
-
-        // 2️⃣ Validation + حساب الإجمالي
-        decimal totalAmount = 0;
-
-        foreach (var item in cartItems)
+        public async Task<ServiceResult<OrderDto>> CreateOrderFromCartAsync(int userId, CreateOrderDto dto)
         {
-            if (item.Product == null || !item.Product.IsActive)
-                return ServiceResult<OrderDto>.Failure($"Product '{item.Product?.ProductName}' is no longer available");
+            using var transaction = await _unitOfWork.BeginTransactionAsync();
 
-            // ✅ تحديد السعر (variant أو base price)
-            var unitPrice = item.ProductVariant?.Price ?? item.Product.BasePrice;
-            var custPrice = item.Technique?.Price ?? 0;
-
-            // ✅ التحقق من الـ Stock
-            if (item.ProductVariant != null)
+            try
             {
-                if (item.ProductVariant.StockQuantity < item.Quantity)
-                    return ServiceResult<OrderDto>.Failure(
-                        $"Not enough stock for '{item.Product.ProductName}' - only {item.ProductVariant.StockQuantity} available");
-            }
-            else
-            {
-                if (item.Product.StockQuantity < item.Quantity)
-                    return ServiceResult<OrderDto>.Failure(
-                        $"Not enough stock for '{item.Product.ProductName}' - only {item.Product.StockQuantity} available");
-            }
+                // 1. جيب الكارت
+                var cartItems = await _unitOfWork.CartItems
+                    .GetQueryable()
+                    .Include(c => c.Product)
+                    .Include(c => c.ProductVariant)
+                    .Include(c => c.Technique)
+                    .Where(c => c.UserId == userId)
+                    .ToListAsync();
 
-            // ✅ الحساب الصح
-            totalAmount += (unitPrice + custPrice) * item.Quantity;
-        }
+                if (!cartItems.Any())
+                    return ServiceResult<OrderDto>.Failure("Cart is empty");
 
-        // 3️⃣ إنشاء Order
-        var order = new Order
-        {
-            UserId = userId,
-            TotalAmount = totalAmount,
-            OrderStatus = OrderStatus.Pending,
-            ShippingAddress = dto.ShippingAddress,
-            PaymentMethod = dto.PaymentMethod,
-            PaymentStatus = PaymentStatus.Pending,
-            TrackingNumber = GenerateTrackingNumber(),
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
+                // 2. Validation + حساب الإجمالي
+                decimal totalAmount = 0;
 
-        await _unitOfWork.Orders.AddAsync(order);
-        await _unitOfWork.SaveAsync(); // عشان ناخد OrderId
-
-        // 4️⃣ إنشاء OrderItems
-        var orderItems = new List<OrderItem>();
-
-        foreach (var cartItem in cartItems)
-        {
-            var unitPrice = cartItem.ProductVariant?.Price ?? cartItem.Product.BasePrice;
-            var custPrice = cartItem.Technique?.Price ?? 0;
-
-            var orderItem = new OrderItem
-            {
-                OrderId = order.OrderId,
-                ProductId = cartItem.ProductId,
-                VariantId = cartItem.VariantId,
-                Quantity = cartItem.Quantity,
-                UnitPrice = unitPrice,
-                CustomizationPrice = custPrice,
-                Subtotal = (unitPrice + custPrice) * cartItem.Quantity // ✅ fix
-            };
-
-            orderItems.Add(orderItem);
-            await _unitOfWork.OrderItems.AddAsync(orderItem);
-        }
-
-        await _unitOfWork.SaveAsync(); // حفظ كل الـ items مرة واحدة
-
-        // 5️⃣ Customization
-        foreach (var cartItem in cartItems)
-        {
-            if (cartItem.TechniqueId != null && cartItem.CustomizationZone != null)
-            {
-                var orderItem = orderItems.First(o =>
-                    o.ProductId == cartItem.ProductId &&
-                    o.VariantId == cartItem.VariantId);
-
-                await _unitOfWork.OrderItemCustomizations.AddAsync(new OrderItemCustomization
+                foreach (var item in cartItems)
                 {
-                    OrderItemId = orderItem.OrderItemId,
-                    Zone = (CustomizationZone)cartItem.CustomizationZone.Value,
-                    TechniqueId = cartItem.TechniqueId.Value,
-                    DesignImageUrl = cartItem.DesignImageUrl,
-                    DesignText = cartItem.DesignText,
-                    CustomizationPrice = cartItem.Technique?.Price ?? 0
-                });
+                    if (item.Product == null || !item.Product.IsActive)
+                        return ServiceResult<OrderDto>.Failure(
+                            $"Product '{item.Product?.ProductName}' is no longer available");
+
+                    var unitPrice = item.ProductVariant?.Price ?? item.Product.BasePrice;
+                    var custPrice = item.Technique?.Price ?? 0;
+
+                    if (item.ProductVariant != null && item.ProductVariant.StockQuantity < item.Quantity)
+                        return ServiceResult<OrderDto>.Failure(
+                            $"Not enough stock for '{item.Product.ProductName}' - only {item.ProductVariant.StockQuantity} available");
+
+                    totalAmount += (unitPrice + custPrice) * item.Quantity;
+                }
+
+                // 3. Validate الدفع قبل ما نعمل الأوردر
+                var paymentValidation = ValidatePayment(dto);
+                if (!paymentValidation.IsSuccess)
+                    return ServiceResult<OrderDto>.Failure(paymentValidation.Message);
+
+                // 4. Simulate الدفع
+                var paymentResult = await SimulatePaymentAsync(dto, totalAmount);
+                if (!paymentResult.IsSuccess)
+                    return ServiceResult<OrderDto>.Failure(paymentResult.Message);
+
+                // 5. اعمل الـ Order
+                var order = new Order
+                {
+                    UserId = userId,
+                    TotalAmount = totalAmount,
+                    OrderStatus = OrderStatus.Processing, // مباشرة Confirmed بعد الدفع
+                    ShippingAddress = $"{dto.FirstName} {dto.LastName} - {dto.ShippingAddress}",
+                    PaymentMethod = dto.PaymentMethod,
+                    PaymentStatus = PaymentStatus.Paid,
+                    TrackingNumber = GenerateTrackingNumber(),
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                await _unitOfWork.Orders.AddAsync(order);
+                await _unitOfWork.SaveAsync();
+
+                // 6. اعمل الـ OrderItems
+                var orderItems = new List<OrderItem>();
+
+                foreach (var cartItem in cartItems)
+                {
+                    var unitPrice = cartItem.ProductVariant?.Price ?? cartItem.Product.BasePrice;
+                    var custPrice = cartItem.Technique?.Price ?? 0;
+
+                    var orderItem = new OrderItem
+                    {
+                        OrderId = order.OrderId,
+                        ProductId = cartItem.ProductId,
+                        VariantId = cartItem.VariantId,
+                        Quantity = cartItem.Quantity,
+                        UnitPrice = unitPrice,
+                        CustomizationPrice = custPrice,
+                        Subtotal = (unitPrice + custPrice) * cartItem.Quantity
+                    };
+
+                    orderItems.Add(orderItem);
+                    await _unitOfWork.OrderItems.AddAsync(orderItem);
+                }
+
+                await _unitOfWork.SaveAsync();
+
+                // 7. Customization
+                foreach (var cartItem in cartItems)
+                {
+                    if (cartItem.TechniqueId != null && cartItem.CustomizationZone != null)
+                    {
+                        var orderItem = orderItems.First(o =>
+                            o.ProductId == cartItem.ProductId &&
+                            o.VariantId == cartItem.VariantId);
+
+                        await _unitOfWork.OrderItemCustomizations.AddAsync(new OrderItemCustomization
+                        {
+                            OrderItemId = orderItem.OrderItemId,
+                            Zone = (CustomizationZone)cartItem.CustomizationZone.Value,
+                            TechniqueId = cartItem.TechniqueId.Value,
+                            DesignImageUrl = cartItem.DesignImageUrl,
+                            DesignText = cartItem.DesignText,
+                            CustomizationPrice = cartItem.Technique?.Price ?? 0
+                        });
+                    }
+                }
+
+                // 8. نقص الـ Stock
+                foreach (var cartItem in cartItems)
+                {
+                    if (cartItem.ProductVariant != null)
+                    {
+                        cartItem.ProductVariant.StockQuantity -= cartItem.Quantity;
+                        _unitOfWork.ProductVariants.Update(cartItem.ProductVariant);
+                    }
+                    else
+                    {
+                        cartItem.Product.StockQuantity -= cartItem.Quantity;
+                        _unitOfWork.Products.Update(cartItem.Product);
+                    }
+                }
+
+                // 9. امسح الكارت
+                foreach (var cartItem in cartItems)
+                    _unitOfWork.CartItems.Delete(cartItem);
+
+                await _unitOfWork.SaveAsync();
+                await transaction.CommitAsync();
+
+                // 10. رجع الـ Order مع كل التفاصيل
+                var result = await GetOrderByIdAsync(order.OrderId, userId);
+                if (result.Succeeded)
+                {
+                    result.Data.TransactionId = paymentResult.TransactionId;
+                    result.Data.PaymentMessage = paymentResult.Message;
+                }
+
+                return result;
             }
-        }
-
-        // 6️⃣ تحديث الـ Stock
-        foreach (var cartItem in cartItems)
-        {
-            if (cartItem.ProductVariant != null)
-            {
-                cartItem.ProductVariant.StockQuantity -= cartItem.Quantity;
-                _unitOfWork.ProductVariants.Update(cartItem.ProductVariant);
-            }
-            else
-            {
-                cartItem.Product.StockQuantity -= cartItem.Quantity;
-                _unitOfWork.Products.Update(cartItem.Product);
-            }
-        }
-
-        // 7️⃣ مسح الكارت
-        foreach (var cartItem in cartItems)
-            _unitOfWork.CartItems.Delete(cartItem);
-
-        await _unitOfWork.SaveAsync();
-
-        await transaction.CommitAsync();
-
-        return await GetOrderByIdAsync(order.OrderId, userId);
-    }
-    catch (Exception ex)
-    {
-        await transaction.RollbackAsync();
-        return ServiceResult<OrderDto>.Failure($"Error creating order: {ex.Message}");
-    }
+          catch (Exception ex)
+{
+    await transaction.RollbackAsync();
+    // ✅ بيجيب الـ inner exception كامل
+    var fullError = ex.InnerException?.Message ?? ex.Message;
+    return ServiceResult<OrderDto>.Failure($"Error: {fullError}");
 }
+        }
 
         public async Task<ServiceResult<OrderDto>> GetOrderByIdAsync(int orderId, int userId)
         {
@@ -211,7 +219,7 @@ namespace Graduation_Project.BLL.Services.Implementations
             }
             catch (Exception ex)
             {
-                return ServiceResult<List<OrderDto>>.Failure($"Error fetching orders: {ex.Message}");
+                return ServiceResult<List<OrderDto>>.Failure($"Error: {ex.Message}");
             }
         }
 
@@ -237,7 +245,7 @@ namespace Graduation_Project.BLL.Services.Implementations
             }
             catch (Exception ex)
             {
-                return ServiceResult<List<OrderDto>>.Failure($"Error fetching orders: {ex.Message}");
+                return ServiceResult<List<OrderDto>>.Failure($"Error: {ex.Message}");
             }
         }
 
@@ -255,10 +263,6 @@ namespace Graduation_Project.BLL.Services.Implementations
                 order.OrderStatus = status;
                 order.UpdatedAt = DateTime.UtcNow;
 
-                // لو الأوردر اتشحن يبقى Paid
-                if (status == OrderStatus.Shipped)
-                    order.PaymentStatus = PaymentStatus.Paid;
-
                 _unitOfWork.Orders.Update(order);
                 await _unitOfWork.SaveAsync();
 
@@ -266,7 +270,7 @@ namespace Graduation_Project.BLL.Services.Implementations
             }
             catch (Exception ex)
             {
-                return ServiceResult<OrderDto>.Failure($"Error updating order: {ex.Message}");
+                return ServiceResult<OrderDto>.Failure($"Error: {ex.Message}");
             }
         }
 
@@ -283,8 +287,9 @@ namespace Graduation_Project.BLL.Services.Implementations
                 if (order == null)
                     return ServiceResult<OrderDto>.Failure("Order not found");
 
-                if (order.OrderStatus != OrderStatus.Pending)
-                    return ServiceResult<OrderDto>.Failure("Only pending orders can be cancelled");
+                if (order.OrderStatus != OrderStatus.Pending &&
+                    order.OrderStatus != OrderStatus.Processing)
+                    return ServiceResult<OrderDto>.Failure("This order cannot be cancelled");
 
                 order.OrderStatus = OrderStatus.Cancelled;
                 order.UpdatedAt = DateTime.UtcNow;
@@ -306,8 +311,81 @@ namespace Graduation_Project.BLL.Services.Implementations
             }
             catch (Exception ex)
             {
-                return ServiceResult<OrderDto>.Failure($"Error cancelling order: {ex.Message}");
+                return ServiceResult<OrderDto>.Failure($"Error: {ex.Message}");
             }
+        }
+
+        // ✅ Validate الدفع قبل ما نبدأ
+        private (bool IsSuccess, string Message) ValidatePayment(CreateOrderDto dto)
+        {
+            if (dto.PaymentMethod == PaymentMethod.CreditCard)
+            {
+                if (dto.CreditCard == null)
+                    return (false, "Credit card details are required");
+
+                if (string.IsNullOrEmpty(dto.CreditCard.CardNumber) ||
+                    dto.CreditCard.CardNumber.Length != 16)
+                    return (false, "Invalid card number");
+
+                if (!IsValidExpiryDate(dto.CreditCard.ExpiryDate))
+                    return (false, "Card has expired or invalid expiry date");
+
+                if (string.IsNullOrEmpty(dto.CreditCard.CVC) ||
+                    dto.CreditCard.CVC.Length != 3)
+                    return (false, "Invalid CVC");
+
+                if (string.IsNullOrEmpty(dto.CreditCard.CardHolderName))
+                    return (false, "Card holder name is required");
+            }
+
+            return (true, "Valid");
+        }
+
+        // ✅ Simulate الدفع
+        private async Task<(bool IsSuccess, string Message, string TransactionId)>
+            SimulatePaymentAsync(CreateOrderDto dto, decimal amount)
+        {
+            await Task.Delay(1000); // Simulate gateway delay
+
+            if (dto.PaymentMethod == PaymentMethod.CashOnDelivery)
+            {
+                return (
+                    true,
+                    "Order confirmed. Pay when your order arrives.",
+                    $"COD-{Guid.NewGuid().ToString("N")[..10].ToUpper()}"
+                );
+            }
+
+            // Credit Card Simulation
+            var card = dto.CreditCard!;
+
+            // بطاقة تبدأ بـ 0000 = فاشلة (للاختبار)
+            if (card.CardNumber.StartsWith("0000"))
+                return (false, "Payment declined by bank", null);
+
+            return (
+                true,
+                $"Payment of {amount} EGP processed successfully",
+                $"TXN-{Guid.NewGuid().ToString("N")[..12].ToUpper()}"
+            );
+        }
+
+        private bool IsValidExpiryDate(string expiry)
+        {
+            if (string.IsNullOrEmpty(expiry) || !expiry.Contains('/'))
+                return false;
+
+            var parts = expiry.Split('/');
+            if (parts.Length != 2) return false;
+
+            if (!int.TryParse(parts[0], out int month) ||
+                !int.TryParse(parts[1], out int year))
+                return false;
+
+            var expiryDate = new DateTime(2000 + year, month, 1)
+                .AddMonths(1).AddDays(-1);
+
+            return expiryDate >= DateTime.UtcNow;
         }
 
         private string GenerateTrackingNumber()
@@ -319,6 +397,8 @@ namespace Graduation_Project.BLL.Services.Implementations
             UserId = order.UserId,
             CustomerName = order.User?.FullName,
             TotalAmount = order.TotalAmount,
+            ShippingCost = 0,
+            FinalTotal = order.TotalAmount,
             OrderStatus = order.OrderStatus,
             OrderStatusText = order.OrderStatus.ToString(),
             ShippingAddress = order.ShippingAddress,

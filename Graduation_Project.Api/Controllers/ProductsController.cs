@@ -11,11 +11,15 @@ namespace Graduation_Project.API.Controllers
     public class ProductsController : ControllerBase
     {
         private readonly IProductService _productService;
+            private readonly IProductDescriptionService _descriptionService;
 
-        public ProductsController(IProductService productService)
-        {
-            _productService = productService;
-        }
+public ProductsController(
+        IProductService productService,
+        IProductDescriptionService descriptionService)
+    {
+        _productService = productService;
+        _descriptionService = descriptionService;
+    }
 
         // الكل يشوف المنتجات الـ Approved
         [HttpGet]
@@ -118,5 +122,24 @@ public async Task<IActionResult> Update(int id, [FromForm] UpdateProductDto dto)
             if (!result.Succeeded) return BadRequest(result.Errors);
             return Ok(new { message = result.Message });
         }
+
+     [HttpPost("generate-description")]
+// [Authorize(Policy = "BrandOwnerOnly")]
+public async Task<IActionResult> GenerateDescription(
+    [FromBody] GenerateDescriptionDto dto)
+{
+    if (!ModelState.IsValid)
+        return BadRequest(ModelState);
+
+    var result = await _descriptionService.GenerateDescriptionAsync(dto);
+
+    if (!result.Succeeded)
+        return BadRequest(result.Errors);
+
+    return Ok(new
+    {
+        suggestion = result.Data
+    });
+}
     }
 }

@@ -47,6 +47,12 @@ namespace Graduation_Project.DAL.Configurations
                 .WithMany(t => t.OrderItemCustomizations)
                 .HasForeignKey(c => c.TechniqueId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Property(c => c.DesignImageUrl)
+    .IsRequired(false);  // ✅
+
+builder.Property(c => c.DesignText)
+    .IsRequired(false);  // ✅
         }
     }
 }

@@ -28,6 +28,11 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole<int>>(options =>
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
+builder.Configuration
+    .AddJsonFile("appsettings.json", optional: false)
+    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true)
+    .AddEnvironmentVariables();
+    
 // ✅ JWT - لازم يجي بعد AddIdentity عشان يـ override الـ default scheme
 var jwt = builder.Configuration.GetSection("Jwt");
 builder.Services.AddAuthentication(options =>
@@ -114,7 +119,9 @@ builder.Services.AddScoped<IInAppEmailService, InAppEmailService>();
 builder.Services.AddScoped<IInAppEmailService, InAppEmailService>();
 builder.Services.AddScoped<IChatService, ChatService>();
 builder.Services.AddScoped<IProfileService, ProfileService>();
-// CORS
+builder.Services.AddHttpClient<IProductDescriptionService, ProductDescriptionService>();
+builder.Services.AddScoped<IProductDescriptionService, ProductDescriptionService>();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
@@ -125,6 +132,7 @@ builder.Services.AddCors(options =>
             .AllowAnyMethod();
     });
 });
+
 builder.Services.AddControllers();
 
 var app = builder.Build();

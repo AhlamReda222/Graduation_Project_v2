@@ -10,31 +10,31 @@ namespace Graduation_Project.BLL.Services.Implementations
     {
         private readonly IUnitOfWork _unitOfWork;
 
-        // النص الثابت للعقد
+        // Contract text (English version)
         private const string ContractText = """
-            شروط وأحكام انضمام أصحاب البراندات - Local Brand Platform
+            Brand Owner Agreement - Local Brand Platform
 
-            1. الالتزام بمعايير الجودة
-               - يجب أن تكون جميع المنتجات أصلية ومطابقة للمواصفات المعلنة.
-               - لا يُسمح ببيع منتجات مقلدة أو مخالفة للقانون.
+            1. Quality Standards
+               - All products must be original and meet the stated specifications.
+               - Selling counterfeit or illegal products is strictly prohibited.
 
-            2. سياسة التسعير
-               - يحق لصاحب البراند تحديد أسعار منتجاته بحرية.
-               - يجب أن تكون الأسعار واضحة وشاملة لجميع الرسوم.
+            2. Pricing Policy
+               - Brand owners have full freedom to set product prices.
+               - Prices must be transparent and include all applicable fees.
 
-            3. خدمة العملاء
-               - يلتزم صاحب البراند بالرد على استفسارات العملاء خلال 48 ساعة.
-               - يجب معالجة الشكاوى بجدية واحترافية.
+            3. Customer Service
+               - Brand owners must respond to customer inquiries within 48 hours.
+               - Complaints must be handled professionally and in a timely manner.
 
-            4. سياسة الإرجاع والاستبدال
-               - يجب توضيح سياسة الإرجاع بشكل واضح.
-               - الالتزام بإرجاع المبالغ في حالة المنتجات المعيبة.
+            4. Return & Refund Policy
+               - A clear return and refund policy must be provided.
+               - Refunds must be issued for defective or incorrect products.
 
-            5. حقوق المنصة
-               - تحتفظ المنصة بحق إيقاف أي براند يخالف هذه الشروط.
-               - يحق للمنصة أخذ نسبة متفق عليها من كل عملية بيع.
+            5. Platform Rights
+               - The platform reserves the right to suspend any brand that violates these terms.
+               - The platform may take a commission from each completed transaction.
 
-            بالموافقة على هذه الشروط، أنت تقر بأنك قرأت وفهمت وتوافق على جميع البنود المذكورة أعلاه.
+            By accepting this agreement, you confirm that you have read, understood, and agree to all the terms stated above.
             """;
 
         public ContractService(IUnitOfWork unitOfWork)
@@ -42,7 +42,7 @@ namespace Graduation_Project.BLL.Services.Implementations
             _unitOfWork = unitOfWork;
         }
 
-        // يجيب نص العقد
+        // Get contract text
         public ServiceResult<ContractDto> GetContract()
         {
             return ServiceResult<ContractDto>.Success(new ContractDto
@@ -51,20 +51,20 @@ namespace Graduation_Project.BLL.Services.Implementations
             });
         }
 
-        // الأونر يوافق على العقد
+        // Brand owner accepts contract
         public async Task<ServiceResult<bool>> AcceptContractAsync(int userId)
         {
             var user = await _unitOfWork.ApplicationUsers.GetByIdAsync(userId);
             if (user == null)
                 return ServiceResult<bool>.Failure("User not found");
 
-            // لازم يكون BrandOwner
+            // Must be BrandOwner
             if (user.UserType != UserType.BrandOwner)
                 return ServiceResult<bool>.Failure("Only brand owners can accept the contract");
 
-            // لو وافق قبل كده
+            // Already accepted
             if (user.HasAcceptedContract)
-                return ServiceResult<bool>.Failure("You have already accepted the contract");
+                return ServiceResult<bool>.Failure("Contract already accepted");
 
             user.HasAcceptedContract = true;
             user.UpdatedAt = DateTime.UtcNow;
@@ -75,7 +75,7 @@ namespace Graduation_Project.BLL.Services.Implementations
             return ServiceResult<bool>.Success(true, "Contract accepted successfully. You can now create your brand!");
         }
 
-        // يشوف الأونر وافق ولا لأ
+        // Check contract status
         public async Task<ServiceResult<ContractStatusDto>> GetContractStatusAsync(int userId)
         {
             var user = await _unitOfWork.ApplicationUsers.GetByIdAsync(userId);
@@ -86,8 +86,8 @@ namespace Graduation_Project.BLL.Services.Implementations
             {
                 HasAcceptedContract = user.HasAcceptedContract,
                 Message = user.HasAcceptedContract
-                    ? "Contract accepted. You can create your brand."
-                    : "Please accept the contract to start creating your brand."
+                    ? "Contract accepted. You can now create your brand."
+                    : "Please accept the contract to continue."
             });
         }
     }
