@@ -17,8 +17,7 @@ namespace Graduation_Project.BLL.Services.Implementations
         public ProductDescriptionService(HttpClient httpClient, IConfiguration config)
         {
             _httpClient = httpClient;
-            _apiKey = config["Groq:ApiKey"];
-        }
+_apiKey = Environment.GetEnvironmentVariable("GROQ_API_KEY");        }
 
         public async Task<ServiceResult<string>> GenerateDescriptionAsync(GenerateDescriptionDto dto)
         {
