@@ -14,7 +14,7 @@ namespace Graduation_Project.BLL.DTOs.Product
         public string ImageUrls { get; set; }
         public bool AllowsCustomization { get; set; }
         // null لو مش بيقبل customization
-        public ProductCustomizationOptionsDto CustomizationOptions { get; set; }
+        public ProductCustomizationOptionsDto? CustomizationOptions { get; set; }
         public ApprovalStatus ApprovalStatus { get; set; }
         public string ApprovalStatusText { get; set; }
         public string RejectionReason { get; set; }
@@ -24,6 +24,11 @@ namespace Graduation_Project.BLL.DTOs.Product
         public decimal AverageRating { get; set; }
         public int ReviewCount { get; set; }
 public decimal BasePrice { get; set; }
-        public List<ProductVariantDto> Variants { get; set; }
+        public List<ProductVariantDto>? Variants { get; set; }
+          public decimal? AiSuggestedPrice { get; set; }
+    public decimal? MinPrice { get; set; }
+    public decimal? MaxPrice { get; set; }
+    public string? PriceReasoning { get; set; }
+
     }
 }

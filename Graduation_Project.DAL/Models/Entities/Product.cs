@@ -30,8 +30,10 @@ namespace Graduation_Project.DAL.Models.Entities
         public decimal AverageRating { get; set; }
         public int ReviewCount { get; set; }
         public int StockQuantity { get; set; } // ✅ ضيفي ده
-
-        // Navigation Properties
+public decimal? AiSuggestedPrice { get; set; }
+public decimal? MinPrice { get; set; }
+public decimal? MaxPrice { get; set; }
+public string? PriceReasoning { get; set; }        // Navigation Properties
         public virtual Brand Brand { get; set; }
         public virtual Category Category { get; set; }
         public virtual ApplicationUser ApprovedByUser { get; set; }

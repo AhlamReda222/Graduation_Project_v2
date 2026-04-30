@@ -85,13 +85,12 @@ public async Task<IActionResult> Create(int brandId, [FromForm] CreateProductDto
     if (!ModelState.IsValid)
         return BadRequest(ModelState);
 
-    var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+   var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
     var result = await _productService.CreateProductAsync(userId, brandId, dto);
 
     if (!result.Succeeded)
-        return BadRequest(result.Errors);
-
+    return Ok(result);
     return CreatedAtAction(nameof(GetById), new { id = result.Data.ProductId }, result.Data);
 }
 

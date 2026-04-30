@@ -739,6 +739,9 @@ namespace Graduation_Project.DAL.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("ProductId"));
 
+                    b.Property<decimal?>("AiSuggestedPrice")
+                        .HasColumnType("numeric");
+
                     b.Property<bool>("AllowsCustomization")
                         .HasColumnType("boolean");
 
@@ -790,6 +793,15 @@ namespace Graduation_Project.DAL.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(true);
+
+                    b.Property<decimal?>("MaxPrice")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("MinPrice")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("PriceReasoning")
+                        .HasColumnType("text");
 
                     b.Property<string>("ProductName")
                         .IsRequired()
