@@ -27,36 +27,56 @@ public async Task<ServiceResult<ProductDto>> CreateProductAsync(int userId, int 
 {
     try
     {
+        // ================= VALIDATE INPUT =================
+        if (dto == null)
+            return ServiceResult<ProductDto>.Failure("Invalid request");
+
+        if (string.IsNullOrWhiteSpace(dto.ProductName))
+            return ServiceResult<ProductDto>.Failure("Product name is required");
+
+        if (string.IsNullOrWhiteSpace(dto.Description))
+            return ServiceResult<ProductDto>.Failure("Description is required");
+
         // ================= BRAND =================
         var brand = await _unitOfWork.Brands
             .GetQueryable()
             .FirstOrDefaultAsync(b => b.BrandId == brandId && b.UserId == userId);
 
         if (brand == null)
-            return ServiceResult<ProductDto>.Failure("Brand not found or not yours");
+            return ServiceResult<ProductDto>.Failure("Brand not found or not owned by user");
 
         if (!brand.IsActive)
             return ServiceResult<ProductDto>.Failure("Brand is not active");
 
         // ================= USER =================
         var user = await _unitOfWork.ApplicationUsers.GetByIdAsync(userId);
-        if (user == null || !user.HasAcceptedContract)
+        if (user == null)
+            return ServiceResult<ProductDto>.Failure("User not found");
+
+        if (!user.HasAcceptedContract)
             return ServiceResult<ProductDto>.Failure("You must accept the contract first");
 
         // ================= CATEGORY =================
         var category = await _unitOfWork.Categories.GetByIdAsync(dto.CategoryId);
         if (category == null)
-            return ServiceResult<ProductDto>.Failure("Category not found");
+            return ServiceResult<ProductDto>.Failure("Invalid category");
 
         // ================= VARIANTS =================
         List<ProductVariantDto>? variants = null;
 
-        if (!string.IsNullOrWhiteSpace(dto.VariantsJson))
+        try
         {
-            variants = JsonSerializer.Deserialize<List<ProductVariantDto>>(
-                dto.VariantsJson,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-            );
+            if (!string.IsNullOrWhiteSpace(dto.VariantsJson))
+            {
+                variants = JsonSerializer.Deserialize<List<ProductVariantDto>>(
+                    dto.VariantsJson,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                );
+            }
+        }
+        catch
+        {
+            return ServiceResult<ProductDto>.Failure("Invalid variants format");
         }
 
         bool hasVariants = variants != null && variants.Any();
@@ -65,38 +85,55 @@ public async Task<ServiceResult<ProductDto>> CreateProductAsync(int userId, int 
         if (!hasVariants)
         {
             if (dto.BasePrice is null || dto.BasePrice <= 0)
-                return ServiceResult<ProductDto>.Failure("Base price is required");
+                return ServiceResult<ProductDto>.Failure("Base price must be greater than 0");
 
             if (dto.StockQuantity is null || dto.StockQuantity <= 0)
-                return ServiceResult<ProductDto>.Failure("Stock is required when no variants");
+                return ServiceResult<ProductDto>.Failure("Stock must be greater than 0");
+        }
+        else
+        {
+            foreach (var v in variants!)
+            {
+                if (v.Price <= 0)
+                    return ServiceResult<ProductDto>.Failure("Variant price must be greater than 0");
+
+                if (v.StockQuantity <= 0)
+                    return ServiceResult<ProductDto>.Failure("Variant stock must be greater than 0");
+
+                if (string.IsNullOrWhiteSpace(v.Size))
+                    return ServiceResult<ProductDto>.Failure("Variant size is required");
+
+                if (string.IsNullOrWhiteSpace(v.Color))
+                    return ServiceResult<ProductDto>.Failure("Variant color is required");
+            }
         }
 
         if (hasVariants && dto.StockQuantity != null)
             return ServiceResult<ProductDto>.Failure("Do not send stock when using variants");
 
-        // ================= IMAGE UPLOAD =================
+        // ================= IMAGE =================
         List<string> uploadedUrls = new();
 
-        if (dto.Images != null && dto.Images.Any())
+        if (dto.Images == null || !dto.Images.Any())
+            return ServiceResult<ProductDto>.Failure("At least one image is required");
+
+        foreach (var image in dto.Images)
         {
-            foreach (var image in dto.Images)
-            {
-                var result = await _aiModerationService.ValidateImageAsync(image);
+            var validation = await _aiModerationService.ValidateImageAsync(image);
 
-                if (!result.IsValid)
-{
-    return ServiceResult<ProductDto>.Success(
-        null,
-        result.Message ?? "Image rejected"
-    );
-}
+            if (!validation.IsValid)
+                return ServiceResult<ProductDto>.Failure(validation.Message ?? "Image rejected by AI");
 
-                var url = await _fileService.UploadFileAsync(image, "images");
-                uploadedUrls.Add(url);
-            }
+            var url = await _fileService.UploadFileAsync(image, "images");
+            uploadedUrls.Add(url);
         }
 
         var imageUrl = uploadedUrls.FirstOrDefault();
+
+        // ================= BASE PRICE =================
+        decimal basePrice = hasVariants
+            ? variants!.Min(v => v.Price)
+            : dto.BasePrice ?? 0;
 
         // ================= AI REQUEST =================
         var aiRequest = new AiModerationRequestDto
@@ -104,7 +141,7 @@ public async Task<ServiceResult<ProductDto>> CreateProductAsync(int userId, int 
             ProductName = dto.ProductName,
             Description = dto.Description,
             Category = category.CategoryName,
-            Price = hasVariants ? variants!.Min(v => v.Price) : dto.BasePrice ?? 0,
+            Price = basePrice,
             ImageUrl = imageUrl
         };
 
@@ -112,48 +149,32 @@ public async Task<ServiceResult<ProductDto>> CreateProductAsync(int userId, int 
         var aiResult = await _aiModerationService.ModerateProductAsync(aiRequest);
 
         if (aiResult.Status == "rejected")
-        {
-            return ServiceResult<ProductDto>.Failure(aiResult.Reason ?? "Rejected by AI");
-        }
+            return ServiceResult<ProductDto>.Failure(aiResult.Reason ?? "Product rejected by AI moderation");
 
         var approvalStatus = aiResult.Status == "auto_approved"
             ? ApprovalStatus.Approved
             : ApprovalStatus.Pending;
 
-        // ================= PRICE PREDICTION =================
+        // ================= AI PRICE (ALWAYS RUN) =================
         AiPredictionResultDto? aiPrediction = null;
 
-      decimal finalPrice;
+        try
+        {
+            aiPrediction = await _aiModerationService.PredictProductAsync(
+                aiRequest,
+                imageUrl,
+                brand.BrandName
+            );
+        }
+        catch
+        {
+            aiPrediction = null;
+        }
 
-if (hasVariants)
-{
-    finalPrice = variants!.Min(v => v.Price);
-}
-else
-{
-    try
-    {
-        aiPrediction = await _aiModerationService.PredictProductAsync(
-            aiRequest,
-            imageUrl,
-            brand.BrandName
-        );
+        var aiPrice = aiPrediction?.PricePrediction?.SuggestedPrice ?? basePrice;
 
-        var aiPrice = aiPrediction?.PricePrediction?.SuggestedPrice
-                      ?? dto.BasePrice
-                      ?? 0;
-
-        // 🔥 هنا القرار
-        if (dto.UseAiSuggestion)
-            finalPrice = aiPrice;
-        else
-            finalPrice = dto.BasePrice ?? aiPrice; // fallback
-    }
-    catch
-    {
-        finalPrice = dto.BasePrice ?? 0;
-    }
-}
+        // المستخدم يختار هل يعتمد AI ولا لا
+        decimal finalPrice = dto.UseAiSuggestion ? aiPrice : basePrice;
 
         // ================= PRODUCT =================
         var product = new Product
@@ -181,31 +202,49 @@ else
         await _unitOfWork.Products.AddAsync(product);
         await _unitOfWork.SaveAsync();
 
-        // ================= DTO =================
+        // ================= VARIANTS =================
+        if (hasVariants)
+        {
+            foreach (var v in variants!)
+            {
+                await _unitOfWork.ProductVariants.AddAsync(new ProductVariant
+                {
+                    ProductId = product.ProductId,
+                    Size = v.Size,
+                    Color = v.Color,
+                    Price = v.Price,
+                    StockQuantity = v.StockQuantity,
+                    SKU = string.IsNullOrWhiteSpace(v.SKU)
+                        ? $"{product.ProductName}-{Guid.NewGuid()}"
+                        : v.SKU
+                });
+            }
+
+            await _unitOfWork.SaveAsync();
+        }
+
+        // ================= FETCH =================
         var productDto = await GetProductByIdAsync(product.ProductId);
 
-        if (!productDto.Succeeded)
-            return productDto;
+        if (!productDto.Succeeded || productDto.Data == null)
+            return ServiceResult<ProductDto>.Failure("Product created but failed to fetch data");
 
-        // ================= AI RESPONSE ATTACH =================
-        if (aiPrediction?.PricePrediction != null)
-        {
-            productDto.Data.AiSuggestedPrice = aiPrediction.PricePrediction.SuggestedPrice;
-            productDto.Data.MinPrice = aiPrediction.PricePrediction.PriceRange?.Min;
-            productDto.Data.MaxPrice = aiPrediction.PricePrediction.PriceRange?.Max;
-            productDto.Data.PriceReasoning = aiPrediction.PricePrediction.Reasoning;
-        }
+        // ================= AI RESPONSE (ALWAYS PRESENT) =================
+        productDto.Data.AiSuggestedPrice = aiPrediction?.PricePrediction?.SuggestedPrice;
+        productDto.Data.MinPrice = aiPrediction?.PricePrediction?.PriceRange?.Min;
+        productDto.Data.MaxPrice = aiPrediction?.PricePrediction?.PriceRange?.Max;
+        productDto.Data.PriceReasoning = aiPrediction?.PricePrediction?.Reasoning;
 
         return ServiceResult<ProductDto>.Success(
             productDto.Data,
             approvalStatus == ApprovalStatus.Approved
                 ? "Product created successfully"
-                : "Product pending review"
+                : "Product created and pending approval"
         );
     }
     catch (Exception ex)
     {
-        return ServiceResult<ProductDto>.Failure(ex.Message);
+        return ServiceResult<ProductDto>.Failure($"Unexpected error: {ex.Message}");
     }
 }// يجيب Product بالـ ID
         public async Task<ServiceResult<ProductDto>> GetProductByIdAsync(int productId)
@@ -622,11 +661,10 @@ public async Task<ServiceResult<ProductDto>> UpdateProductAsync(int productId, i
     ReviewCount = product.ReviewCount,
 
     BasePrice = product.BasePrice,
-    AiSuggestedPrice = null,
-MinPrice = null,
-MaxPrice = null,
-PriceReasoning = null,
-
+ AiSuggestedPrice = product.AiSuggestedPrice,
+MinPrice = product.MinPrice,
+MaxPrice = product.MaxPrice,
+PriceReasoning = product.PriceReasoning,
     Variants = product.Variants?
         .Select(v => new ProductVariantDto
         {

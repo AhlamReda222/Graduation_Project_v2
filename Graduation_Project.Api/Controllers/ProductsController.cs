@@ -89,9 +89,16 @@ public async Task<IActionResult> Create(int brandId, [FromForm] CreateProductDto
 
     var result = await _productService.CreateProductAsync(userId, brandId, dto);
 
-    if (!result.Succeeded)
+if (result == null)
+    return Ok(new { succeeded = false, errors = new[] { "Unexpected error" } });
+
+if (!result.Succeeded)
     return Ok(result);
-    return CreatedAtAction(nameof(GetById), new { id = result.Data.ProductId }, result.Data);
+
+if (result.Data == null)
+    return Ok(new { succeeded = false, errors = new[] { "Product not created" } });
+
+return CreatedAtAction(nameof(GetById), new { id = result.Data.ProductId }, result.Data);
 }
 
        [HttpPut("{id}")]
