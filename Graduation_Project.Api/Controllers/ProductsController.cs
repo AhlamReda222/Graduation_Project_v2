@@ -3,7 +3,7 @@ using Graduation_Project.BLL.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
-
+ 
 namespace Graduation_Project.API.Controllers
 {
     [ApiController]
@@ -11,17 +11,17 @@ namespace Graduation_Project.API.Controllers
     public class ProductsController : ControllerBase
     {
         private readonly IProductService _productService;
-            private readonly IProductDescriptionService _descriptionService;
-
-public ProductsController(
-        IProductService productService,
-        IProductDescriptionService descriptionService)
-    {
-        _productService = productService;
-        _descriptionService = descriptionService;
-    }
-
-        // الكل يشوف المنتجات الـ Approved
+        private readonly IProductDescriptionService _descriptionService;
+ 
+        public ProductsController(
+            IProductService productService,
+            IProductDescriptionService descriptionService)
+        {
+            _productService     = productService;
+            _descriptionService = descriptionService;
+        }
+ 
+        // ✅ Public - Get all approved products
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -29,25 +29,26 @@ public ProductsController(
             if (!result.Succeeded) return BadRequest(result.Errors);
             return Ok(result.Data);
         }
-
-        [HttpGet("{id}")]
+ 
+        // ✅ Public - Get product by ID
+        [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id)
         {
             var result = await _productService.GetProductByIdAsync(id);
             if (!result.Succeeded) return NotFound(result.Errors);
             return Ok(result.Data);
         }
-
-        // Products بتاعت Brand معين
-        [HttpGet("brand/{brandId}")]
+ 
+        // ✅ Public - Get products by brand
+        [HttpGet("brand/{brandId:int}")]
         public async Task<IActionResult> GetByBrand(int brandId)
         {
             var result = await _productService.GetProductsByBrandAsync(brandId);
             if (!result.Succeeded) return BadRequest(result.Errors);
             return Ok(result.Data);
         }
-
-        // تقنيات الطباعة - للكل
+ 
+        // ✅ Public - Get printing techniques
         [HttpGet("printing-techniques")]
         public async Task<IActionResult> GetPrintingTechniques()
         {
@@ -55,8 +56,8 @@ public ProductsController(
             if (!result.Succeeded) return BadRequest(result.Errors);
             return Ok(result.Data);
         }
-
-        // Owner يشوف Products بتاعته
+ 
+        // ✅ Owner - Get my products
         [HttpGet("my-products")]
         [Authorize(Policy = "BrandOwnerOnly")]
         public async Task<IActionResult> GetMyProducts()
@@ -66,8 +67,8 @@ public ProductsController(
             if (!result.Succeeded) return BadRequest(result.Errors);
             return Ok(result.Data);
         }
-
-        // Admin يشوف الـ Pending
+ 
+        // ✅ Admin - Get pending products
         [HttpGet("pending")]
         [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> GetPending()
@@ -76,76 +77,77 @@ public ProductsController(
             if (!result.Succeeded) return BadRequest(result.Errors);
             return Ok(result.Data);
         }
-
-        // Owner يضيف Product
-     [HttpPost("brand/{brandId}")]
-[Authorize(Policy = "BrandOwnerOnly")]
-public async Task<IActionResult> Create(int brandId, [FromForm] CreateProductDto dto)
-{
-    if (!ModelState.IsValid)
-        return BadRequest(ModelState);
-
-   var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-
-    var result = await _productService.CreateProductAsync(userId, brandId, dto);
-
-if (result == null)
-    return Ok(new { succeeded = false, errors = new[] { "Unexpected error" } });
-
-if (!result.Succeeded)
-    return Ok(result);
-
-if (result.Data == null)
-    return Ok(new { succeeded = false, errors = new[] { "Product not created" } });
-
-return CreatedAtAction(nameof(GetById), new { id = result.Data.ProductId }, result.Data);
-}
-
-       [HttpPut("{id}")]
-[Authorize(Policy = "BrandOwnerOnly")]
-public async Task<IActionResult> Update(int id, [FromForm] UpdateProductDto dto)
-{
-    if (!ModelState.IsValid)
-        return BadRequest(ModelState);
-
-    var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-
-    var result = await _productService.UpdateProductAsync(id, userId, dto);
-
-    if (!result.Succeeded)
-        return BadRequest(result.Errors);
-
-    return Ok(result.Data);
-}
-
-        // Owner يحذف Product
-        [HttpDelete("{id}")]
+ 
+        // ✅ Owner - Create product
+        [HttpPost("brand/{brandId:int}")]
+        [Authorize(Policy = "BrandOwnerOnly")]
+        public async Task<IActionResult> Create(int brandId, [FromForm] CreateProductDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+ 
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            var result = await _productService.CreateProductAsync(userId, brandId, dto);
+ 
+            if (result == null)
+                return StatusCode(500, new { message = "Unexpected null result" });
+ 
+            if (!result.Succeeded)
+                return BadRequest(new { succeeded = false, errors = result.Errors, message = result.Message });
+ 
+            return CreatedAtAction(nameof(GetById), new { id = result.Data!.ProductId }, new
+            {
+                succeeded = true,
+                message   = result.Message,
+                data      = result.Data
+            });
+        }
+ 
+        // ✅ Owner - Update product
+        [HttpPut("{id:int}")]
+        [Authorize(Policy = "BrandOwnerOnly")]
+        public async Task<IActionResult> Update(int id, [FromForm] UpdateProductDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+ 
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            var result = await _productService.UpdateProductAsync(id, userId, dto);
+ 
+            if (!result.Succeeded)
+                return BadRequest(new { succeeded = false, errors = result.Errors });
+ 
+            return Ok(new { succeeded = true, data = result.Data });
+        }
+ 
+        // ✅ Owner - Delete product
+        [HttpDelete("{id:int}")]
         [Authorize(Policy = "BrandOwnerOnly")]
         public async Task<IActionResult> Delete(int id)
         {
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
             var result = await _productService.DeleteProductAsync(id, userId);
-            if (!result.Succeeded) return BadRequest(result.Errors);
-            return Ok(new { message = result.Message });
+ 
+            if (!result.Succeeded)
+                return BadRequest(new { succeeded = false, errors = result.Errors });
+ 
+            return Ok(new { succeeded = true, message = result.Message });
         }
-
-     [HttpPost("generate-description")]
-// [Authorize(Policy = "BrandOwnerOnly")]
-public async Task<IActionResult> GenerateDescription(
-    [FromBody] GenerateDescriptionDto dto)
-{
-    if (!ModelState.IsValid)
-        return BadRequest(ModelState);
-
-    var result = await _descriptionService.GenerateDescriptionAsync(dto);
-
-    if (!result.Succeeded)
-        return BadRequest(result.Errors);
-
-    return Ok(new
-    {
-        suggestion = result.Data
-    });
-}
+ 
+        // ✅ Owner - Generate description with AI
+        [HttpPost("generate-description")]
+        [Authorize(Policy = "BrandOwnerOnly")]
+        public async Task<IActionResult> GenerateDescription([FromBody] GenerateDescriptionDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+ 
+            var result = await _descriptionService.GenerateDescriptionAsync(dto);
+ 
+            if (!result.Succeeded)
+                return BadRequest(new { succeeded = false, errors = result.Errors });
+ 
+            return Ok(new { succeeded = true, suggestion = result.Data });
+        }
     }
 }

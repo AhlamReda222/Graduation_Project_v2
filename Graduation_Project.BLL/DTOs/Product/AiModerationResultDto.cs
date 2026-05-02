@@ -7,4 +7,5 @@ namespace Graduation_Project.BLL.DTOs.Product
         public string? Message { get; set; }
         public string? Reason { get; set; }
     }
+
 }

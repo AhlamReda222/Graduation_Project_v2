@@ -12,16 +12,17 @@ namespace Graduation_Project.BLL.Services.Implementations
     {
             private readonly IFileService _fileService;
         private readonly IUnitOfWork _unitOfWork;
-            private readonly IAiModerationService _aiModerationService;
+            private readonly IProductAIService _productAIService;
+          private readonly IAiModerationService  _aiModerationService;
 
 
         public ProductService(IUnitOfWork unitOfWork,
-    IAiModerationService aiModerationService,
-    IFileService fileService)
+    IFileService fileService ,IProductAIService productAIService,IAiModerationService aiModerationService)
 {
     _unitOfWork = unitOfWork;
-    _aiModerationService = aiModerationService;
     _fileService = fileService;
+    _productAIService = productAIService;
+    _aiModerationService = aiModerationService;
 }
 public async Task<ServiceResult<ProductDto>> CreateProductAsync(int userId, int brandId, CreateProductDto dto)
 {
@@ -63,7 +64,6 @@ public async Task<ServiceResult<ProductDto>> CreateProductAsync(int userId, int 
 
         // ================= VARIANTS =================
         List<ProductVariantDto>? variants = null;
-
         try
         {
             if (!string.IsNullOrWhiteSpace(dto.VariantsJson))
@@ -81,7 +81,7 @@ public async Task<ServiceResult<ProductDto>> CreateProductAsync(int userId, int 
 
         bool hasVariants = variants != null && variants.Any();
 
-        // ================= VALIDATION =================
+        // ================= PRICE + STOCK VALIDATION =================
         if (!hasVariants)
         {
             if (dto.BasePrice is null || dto.BasePrice <= 0)
@@ -111,7 +111,30 @@ public async Task<ServiceResult<ProductDto>> CreateProductAsync(int userId, int 
         if (hasVariants && dto.StockQuantity != null)
             return ServiceResult<ProductDto>.Failure("Do not send stock when using variants");
 
-        // ================= IMAGE =================
+        // ================= BASE PRICE =================
+        decimal basePrice = hasVariants
+            ? variants!.Min(v => v.Price)
+            : dto.BasePrice!.Value;
+
+        // ✅ السعر النهائي:
+        // لو الأونر اختار AI suggestion وبعت قيمة valid → استخدمها
+        // لو لا → استخدم السعر اللي هو حطه
+        decimal finalPrice;
+
+        if (dto.UseAiSuggestion
+            && dto.AiSuggestedPrice.HasValue
+            && dto.AiSuggestedPrice.Value > 0)
+        {
+            finalPrice = dto.AiSuggestedPrice.Value;
+        }
+        else
+        {
+            finalPrice = basePrice;
+        }
+
+        // ================= IMAGE UPLOAD =================
+        // ✅ الـ Image Validation بالفعل اتعملت Real-time من الفرونت
+        // هنا بس بنعمل Upload للصور
         List<string> uploadedUrls = new();
 
         if (dto.Images == null || !dto.Images.Any())
@@ -119,81 +142,51 @@ public async Task<ServiceResult<ProductDto>> CreateProductAsync(int userId, int 
 
         foreach (var image in dto.Images)
         {
-            var validation = await _aiModerationService.ValidateImageAsync(image);
-
-            if (!validation.IsValid)
-                return ServiceResult<ProductDto>.Failure(validation.Message ?? "Image rejected by AI");
-
             var url = await _fileService.UploadFileAsync(image, "images");
             uploadedUrls.Add(url);
         }
 
-        var imageUrl = uploadedUrls.FirstOrDefault();
-
-        // ================= BASE PRICE =================
-        decimal basePrice = hasVariants
-            ? variants!.Min(v => v.Price)
-            : dto.BasePrice ?? 0;
-
-        // ================= AI REQUEST =================
+        // ================= FINAL MODERATION (نص فقط) =================
+        // ✅ الـ Text Moderation بتتعمل هنا عند الـ Submit النهائي
         var aiRequest = new AiModerationRequestDto
         {
             ProductName = dto.ProductName,
             Description = dto.Description,
-            Category = category.CategoryName,
-            Price = basePrice,
-            ImageUrl = imageUrl
+            Category    = category.CategoryName,
+            Price       = finalPrice,
+            Images      = uploadedUrls
         };
 
-        // ================= MODERATION =================
         var aiResult = await _aiModerationService.ModerateProductAsync(aiRequest);
 
-        if (aiResult.Status == "rejected")
-            return ServiceResult<ProductDto>.Failure(aiResult.Reason ?? "Product rejected by AI moderation");
-
-        var approvalStatus = aiResult.Status == "auto_approved"
-            ? ApprovalStatus.Approved
-            : ApprovalStatus.Pending;
-
-        // ================= AI PRICE (ALWAYS RUN) =================
-        AiPredictionResultDto? aiPrediction = null;
-
-        try
+        var approvalStatus = aiResult.Status switch
         {
-            aiPrediction = await _aiModerationService.PredictProductAsync(
-                aiRequest,
-                imageUrl,
-                brand.BrandName
-            );
-        }
-        catch
-        {
-            aiPrediction = null;
-        }
-
-        var aiPrice = aiPrediction?.PricePrediction?.SuggestedPrice ?? basePrice;
-
-        // المستخدم يختار هل يعتمد AI ولا لا
-        decimal finalPrice = dto.UseAiSuggestion ? aiPrice : basePrice;
+            "auto_approved" => ApprovalStatus.Approved,
+            "rejected"      => ApprovalStatus.Rejected,
+            _               => ApprovalStatus.Pending
+        };
 
         // ================= PRODUCT =================
         var product = new Product
         {
-            BrandId = brandId,
+            BrandId    = brandId,
             CategoryId = dto.CategoryId,
             ProductName = dto.ProductName,
             Description = dto.Description,
-            ImageUrls = string.Join(",", uploadedUrls),
+            ImageUrls   = string.Join(",", uploadedUrls),
 
-            BasePrice = finalPrice,
+            BasePrice     = finalPrice,
             StockQuantity = hasVariants ? 0 : dto.StockQuantity!.Value,
 
-            AllowsCustomization = dto.Customization != null,
+            AllowsCustomization = dto.Customization != null &&
+                (dto.Customization.AllowsPrinting || dto.Customization.AllowsText),
             AllowsPrinting = dto.Customization?.AllowsPrinting ?? false,
-            AllowsText = dto.Customization?.AllowsText ?? false,
+            AllowsText     = dto.Customization?.AllowsText     ?? false,
 
             ApprovalStatus = approvalStatus,
-            IsActive = approvalStatus == ApprovalStatus.Approved,
+            IsActive       = approvalStatus == ApprovalStatus.Approved,
+            ApprovalDate   = approvalStatus == ApprovalStatus.Approved ? DateTime.UtcNow : null,
+            RejectionReason = approvalStatus == ApprovalStatus.Rejected ? aiResult.Reason : null,
 
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -209,44 +202,56 @@ public async Task<ServiceResult<ProductDto>> CreateProductAsync(int userId, int 
             {
                 await _unitOfWork.ProductVariants.AddAsync(new ProductVariant
                 {
-                    ProductId = product.ProductId,
-                    Size = v.Size,
-                    Color = v.Color,
-                    Price = v.Price,
+                    ProductId     = product.ProductId,
+                    Size          = v.Size,
+                    Color         = v.Color,
+                    Price         = v.Price,
                     StockQuantity = v.StockQuantity,
                     SKU = string.IsNullOrWhiteSpace(v.SKU)
                         ? $"{product.ProductName}-{Guid.NewGuid()}"
                         : v.SKU
                 });
             }
-
             await _unitOfWork.SaveAsync();
         }
 
-        // ================= FETCH =================
+        // ================= CUSTOMIZATION ZONES =================
+        if (product.AllowsCustomization && dto.Customization?.Zones != null)
+        {
+            foreach (var zone in dto.Customization.Zones)
+            {
+                await _unitOfWork.ProductCustomizationZones.AddAsync(new ProductCustomizationZone
+                {
+                    ProductId   = product.ProductId,
+                    Zone        = (CustomizationZone)zone,
+                    IsAvailable = true
+                });
+            }
+            await _unitOfWork.SaveAsync();
+        }
+
+        // ================= FETCH + RETURN =================
         var productDto = await GetProductByIdAsync(product.ProductId);
 
         if (!productDto.Succeeded || productDto.Data == null)
             return ServiceResult<ProductDto>.Failure("Product created but failed to fetch data");
 
-        // ================= AI RESPONSE (ALWAYS PRESENT) =================
-        productDto.Data.AiSuggestedPrice = aiPrediction?.PricePrediction?.SuggestedPrice;
-        productDto.Data.MinPrice = aiPrediction?.PricePrediction?.PriceRange?.Min;
-        productDto.Data.MaxPrice = aiPrediction?.PricePrediction?.PriceRange?.Max;
-        productDto.Data.PriceReasoning = aiPrediction?.PricePrediction?.Reasoning;
+        var message = approvalStatus switch
+        {
+            ApprovalStatus.Approved => "Product created and approved automatically",
+            ApprovalStatus.Rejected => $"Product rejected: {aiResult.Reason}",
+            _                       => "Product created and pending manual approval"
+        };
 
-        return ServiceResult<ProductDto>.Success(
-            productDto.Data,
-            approvalStatus == ApprovalStatus.Approved
-                ? "Product created successfully"
-                : "Product created and pending approval"
-        );
+        return ServiceResult<ProductDto>.Success(productDto.Data, message);
     }
     catch (Exception ex)
     {
         return ServiceResult<ProductDto>.Failure($"Unexpected error: {ex.Message}");
     }
-}// يجيب Product بالـ ID
+}
+
+// يجيب Product بالـ ID
         public async Task<ServiceResult<ProductDto>> GetProductByIdAsync(int productId)
         {
             try
@@ -359,8 +364,7 @@ public async Task<ServiceResult<ProductDto>> CreateProductAsync(int userId, int 
             {
                 return ServiceResult<List<ProductDto>>.Failure($"Error fetching pending products: {ex.Message}");
             }
-        }
-public async Task<ServiceResult<ProductDto>> UpdateProductAsync(int productId, int userId, UpdateProductDto dto)
+        }public async Task<ServiceResult<ProductDto>> UpdateProductAsync(int productId, int userId, UpdateProductDto dto)
 {
     try
     {
@@ -375,110 +379,88 @@ public async Task<ServiceResult<ProductDto>> UpdateProductAsync(int productId, i
             return ServiceResult<ProductDto>.Failure("Product not found");
 
         if (product.Brand.UserId != userId)
-            return ServiceResult<ProductDto>.Failure("You can only update your own products");
+            return ServiceResult<ProductDto>.Failure("Unauthorized");
 
         bool hasVariants = dto.Variants != null && dto.Variants.Any();
 
-        // ======================================================
-        // ✅ VALIDATION (same as create)
-        // ======================================================
+        // ================= VALIDATION =================
         if (!hasVariants)
         {
             if (dto.BasePrice <= 0)
                 return ServiceResult<ProductDto>.Failure("Base price is required");
 
             if (dto.StockQuantity == null || dto.StockQuantity <= 0)
-                return ServiceResult<ProductDto>.Failure("Stock is required when no variants");
+                return ServiceResult<ProductDto>.Failure("Stock is required");
         }
 
         if (hasVariants && dto.StockQuantity != null)
-            return ServiceResult<ProductDto>.Failure("Do not send stock when using variants");
-
-        bool allowsCustomization = dto.Customization != null &&
-            (dto.Customization.AllowsPrinting || dto.Customization.AllowsText);
-
-        if (allowsCustomization &&
-            (dto.Customization.Zones == null || !dto.Customization.Zones.Any()))
-        {
-            return ServiceResult<ProductDto>.Failure("Customizable products must have at least one zone");
-        }
+            return ServiceResult<ProductDto>.Failure("Do not send stock with variants");
 
         var category = await _unitOfWork.Categories.GetByIdAsync(dto.CategoryId);
+        if (category == null)
+            return ServiceResult<ProductDto>.Failure("Invalid category");
 
-        // ======================================================
-        // 🖼️ IMAGE HANDLING (SMART MERGE)
-        // ======================================================
-
+        // ================= IMAGES =================
         List<string> uploadedUrls = new();
 
-        // 1️⃣ لو المستخدم رفع صور جديدة
         if (dto.Images != null && dto.Images.Any())
         {
             foreach (var img in dto.Images)
             {
+                // ✅ validate image زي create
+                var validation = await _productAIService.ValidateImageAsync(img);
+
+                if (!validation.IsValid)
+                    return ServiceResult<ProductDto>.Failure(validation.Message ?? "Image rejected");
+
                 var url = await _fileService.UploadFileAsync(img, "products");
                 uploadedUrls.Add(url);
             }
         }
         else
         {
-            // 2️⃣ لو مفيش صور جديدة → احتفظ بالقديم
-            if (!string.IsNullOrEmpty(product.ImageUrls))
-                uploadedUrls = product.ImageUrls.Split(',').ToList();
+            // احتفظ بالقديم
+            uploadedUrls = product.ImageUrls?.Split(',').ToList() ?? new List<string>();
         }
 
-        // ======================================================
-        // 🤖 AI MODERATION (use first image)
-        // ======================================================
-        var aiRequest = new AiModerationRequestDto
-        {
-            ProductName = dto.ProductName,
-            Description = dto.Description,
-            Price = hasVariants ? dto.Variants.Min(v => v.Price) : dto.BasePrice,
-            Category = category?.CategoryName ?? "",
-            ImageUrl = uploadedUrls.FirstOrDefault()
-        };
+        var imageUrl = uploadedUrls.FirstOrDefault();
 
-        var aiResult = await _aiModerationService.ModerateProductAsync(aiRequest);
-
-        var approvalStatus = aiResult.Status switch
-        {
-            "auto_approved" => ApprovalStatus.Approved,
-            "rejected" => ApprovalStatus.Rejected,
-            _ => ApprovalStatus.Pending
-        };
-
-        // ======================================================
-        // 🧾 UPDATE CORE DATA
-        // ======================================================
-        product.ProductName = dto.ProductName;
-        product.Description = dto.Description;
-        product.CategoryId = dto.CategoryId;
-
-        product.ImageUrls = string.Join(",", uploadedUrls);
-
-        product.BasePrice = hasVariants
+        // ================= BASE PRICE =================
+        decimal basePrice = hasVariants
             ? dto.Variants.Min(v => v.Price)
             : dto.BasePrice;
 
-        product.StockQuantity = hasVariants
-            ? 0
-            : dto.StockQuantity!.Value;
+        // ================= AI MODERATION =================
+        var aiResult = await _productAIService.ModerateTextAsync(
+            dto.ProductName,
+            dto.Description,
+            category.CategoryName,
+            basePrice
+        );
 
-        product.AllowsCustomization = allowsCustomization;
-        product.AllowsPrinting = allowsCustomization && dto.Customization?.AllowsPrinting == true;
-        product.AllowsText = allowsCustomization && dto.Customization?.AllowsText == true;
+        if (aiResult.Status == "rejected")
+            return ServiceResult<ProductDto>.Failure(aiResult.Reason ?? "Rejected by AI");
+
+        var approvalStatus = aiResult.Status == "auto_approved"
+            ? ApprovalStatus.Approved
+            : ApprovalStatus.Pending;
+
+        // ================= UPDATE =================
+        product.ProductName = dto.ProductName;
+        product.Description = dto.Description;
+        product.CategoryId = dto.CategoryId;
+        product.ImageUrls = string.Join(",", uploadedUrls);
+
+        product.BasePrice = basePrice;
+        product.StockQuantity = hasVariants ? 0 : dto.StockQuantity!.Value;
 
         product.UpdatedAt = DateTime.UtcNow;
 
         product.ApprovalStatus = approvalStatus;
         product.IsActive = approvalStatus == ApprovalStatus.Approved;
-        product.ApprovalDate = approvalStatus == ApprovalStatus.Approved ? DateTime.UtcNow : null;
-        product.RejectionReason = approvalStatus == ApprovalStatus.Rejected ? aiResult.Reason : null;
+        product.RejectionReason = aiResult.Status == "rejected" ? aiResult.Reason : null;
 
-        // ======================================================
-        // 🔁 REPLACE VARIANTS
-        // ======================================================
+        // ================= VARIANTS =================
         var oldVariants = await _unitOfWork.ProductVariants.FindAsync(v => v.ProductId == productId);
         foreach (var v in oldVariants)
             _unitOfWork.ProductVariants.Delete(v);
@@ -494,52 +476,27 @@ public async Task<ServiceResult<ProductDto>> UpdateProductAsync(int productId, i
                     Color = v.Color,
                     Price = v.Price,
                     StockQuantity = v.StockQuantity,
-                    SKU = v.SKU ?? $"{productId}-{v.Size}-{v.Color}"
-                });
-            }
-        }
-
-        // ======================================================
-        // 🎨 CUSTOMIZATION
-        // ======================================================
-        var oldZones = await _unitOfWork.ProductCustomizationZones.FindAsync(z => z.ProductId == productId);
-        foreach (var z in oldZones)
-            _unitOfWork.ProductCustomizationZones.Delete(z);
-
-        if (allowsCustomization)
-        {
-            foreach (var zone in dto.Customization.Zones)
-            {
-                await _unitOfWork.ProductCustomizationZones.AddAsync(new ProductCustomizationZone
-                {
-                    ProductId = productId,
-                    Zone = (CustomizationZone)zone,
-                    IsAvailable = true
+                    SKU = v.SKU ?? $"{productId}-{Guid.NewGuid()}"
                 });
             }
         }
 
         await _unitOfWork.SaveAsync();
 
-        var productDto = await GetProductByIdAsync(productId);
-        if (!productDto.Succeeded)
-            return productDto;
+        var result = await GetProductByIdAsync(productId);
 
-        var message = approvalStatus switch
-        {
-            ApprovalStatus.Approved => "تم تحديث المنتج بنجاح",
-            ApprovalStatus.Rejected => $"تم رفض التحديث: {aiResult.Reason}",
-            _ => "تم تحديث المنتج وهو في انتظار المراجعة"
-        };
-
-        return ServiceResult<ProductDto>.Success(productDto.Data, message);
+        return ServiceResult<ProductDto>.Success(
+            result.Data,
+            approvalStatus == ApprovalStatus.Approved
+                ? "Updated successfully"
+                : "Updated and pending approval"
+        );
     }
     catch (Exception ex)
     {
         return ServiceResult<ProductDto>.Failure(ex.Message);
     }
 }
-
         // Owner يحذف Product بتاعته
         public async Task<ServiceResult<bool>> DeleteProductAsync(int productId, int userId)
         {
